@@ -19,7 +19,6 @@ BLOCKED_URLS = {
     ),
 }
 
-
 RULES = {
     "*": [
         rule.method_one_of(["get", "head", "options"]).then("allow"),
@@ -28,38 +27,34 @@ RULES = {
 }
 
 
+def _log(msg: str) -> None:
+    logger.info(msg)
+    print(msg, flush=True, file=sys.stderr)
+
+
 class TrafficControlAddon:
     def request(self, flow: http.HTTPFlow) -> None:
-        msg = f">>> {flow.request.method} {flow.request.pretty_url}"
-        logger.info(msg)
-        print(msg, flush=True, file=sys.stderr)
+        _log(f">>> {flow.request.method} {flow.request.pretty_url}")
 
-        # Explicit blocks always win, regardless of handled status
-        blocked_prefixes = BLOCKED_URLS.get(flow.request.host, ())
-        if blocked_prefixes and any(
-            flow.request.path.startswith(p) for p in blocked_prefixes
-        ):
-            msg = f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}"
-            logger.info(msg)
-            print(msg, flush=True, file=sys.stderr)
+        if self._is_blocked(flow):
+            _log(f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}")
             flow.response = http.Response.make(502)
             return
 
-        # Safe (read-only) methods are allowed to any destination
         if flow.request.method in SAFE_METHODS:
             return
 
-        # Auth-handled flows (known API endpoints) are allowed for any method
         if flow.metadata.get("handled"):
             return
 
         # Default deny: unsafe method to unknown destination
-        msg = f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}"
-        logger.info(msg)
-        print(msg, flush=True, file=sys.stderr)
+        _log(f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}")
         flow.response = http.Response.make(502)
 
     def response(self, flow: http.HTTPFlow) -> None:
-        msg = f"<<< {flow.response.status_code} {flow.request.pretty_url}"
-        logger.info(msg)
-        print(msg, flush=True, file=sys.stderr)
+        _log(f"<<< {flow.response.status_code} {flow.request.pretty_url}")
+
+    @staticmethod
+    def _is_blocked(flow: http.HTTPFlow) -> bool:
+        prefixes = BLOCKED_URLS.get(flow.request.host, ())
+        return any(flow.request.path.startswith(p) for p in prefixes)
