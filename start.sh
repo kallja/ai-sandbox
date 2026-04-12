@@ -37,16 +37,18 @@ MSG
 else
   printf '%s' "$CREDS_JSON" | $DC exec -T proxy \
     bash -c 'mkdir -p ~/.config/proxy/secrets && cat > ~/.config/proxy/secrets/claude.json'
-  printf '%s' "$CREDS_JSON" | jq '{
+  printf '%s' "$CREDS_JSON" \
+  | jq '{
     claudeAiOauth: {
-      access_token: "proxy-injected",
-      refresh_token: "proxy-injected",
-      expires_at: .claudeAiOauth.expiresAt,
+      accessToken: "proxy-injected-accessToken",
+      refreshToken: "proxy-injected-refreshToken",
+      expiresAt: .claudeAiOauth.expiresAt,
       scopes: .claudeAiOauth.scopes,
-      subscription_type: .claudeAiOauth.subscriptionType,
-      rate_limit_tier: .claudeAiOauth.rateLimitTier
+      subscriptionType: .claudeAiOauth.subscriptionType,
+      rateLimitTier: .claudeAiOauth.rateLimitTier
     }
-  }' | $DC exec -T claude-code \
+  }'\
+  | $DC exec -T claude-code \
     bash -c 'mkdir -p ~/.claude && cat > ~/.claude/.credentials.json'
   echo "Credentials injected into containers." >&2
 fi
