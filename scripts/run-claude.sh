@@ -36,4 +36,4 @@ if ! $DC ps --status running claude-code --quiet 2>/dev/null | grep -q .; then
   fi
 fi
 
-$DC exec -u claude claude-code claude
+$DC exec -u claude claude-code "${@:-claude}"
