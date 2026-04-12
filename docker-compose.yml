@@ -1,8 +1,8 @@
 services:
   proxy:
     build: ./proxy
-    # ports:
-      # - "127.0.0.1:8081:8081" # mitmweb UI
+    ports:
+      - "127.0.0.1:8081:8081" # mitmweb UI
     networks:
       public:
       internal_only:
