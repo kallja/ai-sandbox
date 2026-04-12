@@ -1,3 +1,7 @@
 {
-    "voiceEnabled": false
+    "voiceEnabled": false,
+    "skipDangerousModePermissionPrompt": true,
+    "permissions": {
+        "defaultMode": "bypassPermissions"
+    }
 }
