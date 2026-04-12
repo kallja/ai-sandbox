@@ -1,6 +1,8 @@
 services:
   proxy:
-    build: ./proxy
+    build:
+      context: .
+      dockerfile: proxy/Dockerfile
     ports:
       - "127.0.0.1:8081:8081" # mitmweb UI
     networks:
@@ -13,7 +15,9 @@ services:
       - shared-certs:/shared-certs
 
   claude-code:
-    build: ./claude-code
+    build:
+      context: .
+      dockerfile: claude-code/Dockerfile
     environment:
       - HTTP_PROXY=http://proxy.local:8080
       - HTTPS_PROXY=http://proxy.local:8080
