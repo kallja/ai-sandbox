@@ -13,11 +13,11 @@ docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d --build --force-recreat
 
 DC="docker compose -f $SCRIPT_DIR/docker-compose.yml"
 
-echo "Copying Claude config into claude-code container..." >&2
-[ -f ~/.claude/settings.json ] && cat ~/.claude/settings.json | $DC exec -T claude-code \
-  bash -c 'mkdir -p ~/.claude && cat > ~/.claude/settings.json'
-[ -f ~/.claude.json ] && cat ~/.claude.json | $DC exec -T claude-code \
-  bash -c 'cat > ~/.claude.json'
+# echo "Copying Claude config into claude-code container..." >&2
+# [ -f ~/.claude/settings.json ] && cat ~/.claude/settings.json | $DC exec -T claude-code \
+#   bash -c 'mkdir -p ~/.claude && cat > ~/.claude/settings.json'
+# [ -f ~/.claude.json ] && cat ~/.claude.json | $DC exec -T claude-code \
+#   bash -c 'cat > ~/.claude.json'
 
 echo "Extracting Claude Code credentials from macOS Keychain..." >&2
 CREDS_JSON="$(security find-generic-password \
