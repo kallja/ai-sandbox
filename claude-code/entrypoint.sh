@@ -16,4 +16,4 @@ echo "mitmproxy CA cert installed"
 # Ensure all volumes under home are owned by claude
 chown -R claude:claude /home/claude
 
-exec su-exec claude "$@"
+exec gosu claude "$@"
