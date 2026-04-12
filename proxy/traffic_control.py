@@ -1,6 +1,7 @@
 import logging
 import sys
 from mitmproxy import http
+from rule import rule
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,14 @@ BLOCKED_URLS = {
 }
 
 
+RULES = {
+    "*": [
+        rule.method_one_of(["get", "head", "options"]).then("allow"),
+        rule.then("deny"),
+    ],
+}
+
+
 class TrafficControlAddon:
     def request(self, flow: http.HTTPFlow) -> None:
         msg = f">>> {flow.request.method} {flow.request.pretty_url}"
@@ -27,7 +36,9 @@ class TrafficControlAddon:
 
         # Explicit blocks always win, regardless of handled status
         blocked_prefixes = BLOCKED_URLS.get(flow.request.host, ())
-        if blocked_prefixes and any(flow.request.path.startswith(p) for p in blocked_prefixes):
+        if blocked_prefixes and any(
+            flow.request.path.startswith(p) for p in blocked_prefixes
+        ):
             msg = f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}"
             logger.info(msg)
             print(msg, flush=True, file=sys.stderr)
