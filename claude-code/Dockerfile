@@ -9,7 +9,7 @@ COPY config/ /root/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENV PATH="~/.local/bin:$PATH"
+ENV PATH="/root/.local/bin:$PATH"
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["sleep", "infinity"]
