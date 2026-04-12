@@ -5,13 +5,14 @@ services:
       - "127.0.0.1:8081:8081" # mitmweb UI
       - "127.0.0.1:8080:8080" # proxy port
     networks:
-      isolated_net:
+      public:
+      internal_only:
         aliases:
           - proxy.local
-      public_net:
     volumes:
       - mitmproxy-data:/home/mitmproxy/.mitmproxy
       - shared-certs:/shared-certs
+      - "/Library/Application Support/Cloudflare/installed_cert.pem:/usr/local/share/ca-certificates/cloudflare.crt:ro"
 
   client:
     build: ./client
@@ -21,41 +22,56 @@ services:
       - http_proxy=http://proxy.local:8080
       - https_proxy=http://proxy.local:8080
     networks:
-      - isolated_net
+      - internal_only
     volumes:
       - shared-certs:/shared-certs:ro
     depends_on:
       - proxy
+      - public-test-server
+      - internal-test-server
 
-  # claude-code:
-  #   build: ./claude-code
-  #   environment:
-  #     - HTTP_PROXY=http://proxy.local:8080
-  #     - HTTPS_PROXY=http://proxy.local:8080
-  #     - http_proxy=http://proxy.local:8080
-  #     - https_proxy=http://proxy.local:8080
-  #     - NODE_EXTRA_CA_CERTS=/shared-certs/mitmproxy-ca-cert.pem
-  #   networks:
-  #     - isolated_net
-  #   volumes:
-  #     - shared-certs:/shared-certs:ro
-  #     # - ~/.claude:/root/.claude:ro
-  #   depends_on:
-  #     - proxy
+  claude-code:
+    build: ./claude-code
+    environment:
+      - HTTP_PROXY=http://proxy.local:8080
+      - HTTPS_PROXY=http://proxy.local:8080
+      - http_proxy=http://proxy.local:8080
+      - https_proxy=http://proxy.local:8080
+      - NODE_EXTRA_CA_CERTS=/shared-certs/mitmproxy-ca-cert.pem
+    networks:
+      - internal_only
+    volumes:
+      - shared-certs:/shared-certs:ro
+      # - ~/.claude:/root/.claude:ro
+    depends_on:
+      - proxy
 
-  # test-server:
-  #   build: ./test-server
-  #   ports:
-  #     - "127.0.0.1:3000:3000"
-  #   networks:
-  #     public_net:
-  #       aliases:
-  #         - test-server.local
+  public-test-server:
+    build: ./test-server
+    environment:
+      - PORT=80
+    # ports:
+    #   - "127.0.0.1:3000:80"
+    networks:
+      public:
+        aliases:
+          - public-server.local
+
+  internal-test-server:
+    build: ./test-server
+    environment:
+      - PORT=80
+    # ports:
+    #   - "127.0.0.1:3000:80"
+    networks:
+      internal_only:
+        aliases:
+          - internal-server.local
 
 networks:
-  isolated_net:
+  internal_only:
     internal: true
-  public_net:
+  public:
     driver: bridge
 
 volumes:
