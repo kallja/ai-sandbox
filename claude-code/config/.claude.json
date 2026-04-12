@@ -2,7 +2,7 @@
   "numStartups": 1,
   "hasCompletedOnboarding": true,
   "projects": {
-    "/repo": {
+    "/home/claude/repo": {
       "hasTrustDialogAccepted": true
     }
   }

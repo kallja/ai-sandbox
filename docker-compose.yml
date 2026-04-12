@@ -1,9 +1,8 @@
 services:
   proxy:
     build: ./proxy
-    ports:
-      - "127.0.0.1:8081:8081" # mitmweb UI
-      - "127.0.0.1:8080:8080" # proxy port
+    # ports:
+      # - "127.0.0.1:8081:8081" # mitmweb UI
     networks:
       public:
       internal_only:
@@ -26,9 +25,9 @@ services:
       - internal_only
     volumes:
       - shared-certs:/shared-certs:ro
-      - .:/repo
-      - claude-memory:/root/.claude/projects
-    working_dir: /repo
+      - .:/home/claude/repo
+      - claude-memory:/home/claude/.claude/projects
+    working_dir: /home/claude/repo
     depends_on:
       - proxy
 

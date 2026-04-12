@@ -49,7 +49,7 @@ else
     }
   }'\
   | $DC exec -T claude-code \
-    bash -c 'mkdir -p ~/.claude && cat > ~/.claude/.credentials.json'
+    bash -c 'mkdir -p /home/claude/.claude && cat > /home/claude/.claude/.credentials.json && chown -R claude:claude /home/claude/.claude'
   echo "Credentials injected into containers." >&2
 fi
 

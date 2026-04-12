@@ -13,4 +13,7 @@ export NODE_EXTRA_CA_CERTS=/shared-certs/mitmproxy-ca-cert.pem
 
 echo "mitmproxy CA cert installed"
 
-exec "$@"
+# Ensure all volumes under home are owned by claude
+chown -R claude:claude /home/claude
+
+exec su-exec claude "$@"
