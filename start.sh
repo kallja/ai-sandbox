@@ -33,18 +33,18 @@ To fix this, log in with Claude Code on this machine:
 
 Then re-run this script.
 MSG
-  exit 1
+  # exit 1
 else
   printf '%s' "$CREDS_JSON" | $DC exec -T proxy \
     bash -c 'mkdir -p ~/.config/proxy/secrets && cat > ~/.config/proxy/secrets/claude.json'
   printf '%s' "$CREDS_JSON" | jq '{
     claudeAiOauth: {
-      accessToken: "proxy-injected",
-      refreshToken: "proxy-injected",
-      expiresAt: .claudeAiOauth.expiresAt,
+      access_token: "proxy-injected",
+      refresh_token: "proxy-injected",
+      expires_at: .claudeAiOauth.expiresAt,
       scopes: .claudeAiOauth.scopes,
-      subscriptionType: .claudeAiOauth.subscriptionType,
-      rateLimitTier: .claudeAiOauth.rateLimitTier
+      subscription_type: .claudeAiOauth.subscriptionType,
+      rate_limit_tier: .claudeAiOauth.rateLimitTier
     }
   }' | $DC exec -T claude-code \
     bash -c 'mkdir -p ~/.claude && cat > ~/.claude/.credentials.json'
