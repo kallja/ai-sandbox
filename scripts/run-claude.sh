@@ -2,7 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DC="docker compose -f $SCRIPT_DIR/docker-compose.yml"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DC="docker compose -f $REPO_ROOT/docker-compose.yml"
 
 if ! $DC ps --status running claude-code --quiet 2>/dev/null | grep -q .; then
   echo "Container not running. Starting services..." >&2

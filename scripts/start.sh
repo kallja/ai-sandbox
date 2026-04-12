@@ -3,15 +3,16 @@
 # Runs on the HOST (macOS).
 #
 # Usage:
-#   ./proxy-test/start.sh
+#   ./scripts/start.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "Starting proxy-test services..." >&2
-docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d --build --force-recreate
+docker compose -f "$REPO_ROOT/docker-compose.yml" up -d --build --force-recreate
 
-DC="docker compose -f $SCRIPT_DIR/docker-compose.yml"
+DC="docker compose -f $REPO_ROOT/docker-compose.yml"
 
 # echo "Copying Claude config into claude-code container..." >&2
 # [ -f ~/.claude/settings.json ] && cat ~/.claude/settings.json | $DC exec -T claude-code \
@@ -56,9 +57,9 @@ fi
 cleanup() {
   echo "" >&2
   echo "Stopping proxy-test services..." >&2
-  docker compose -f "$SCRIPT_DIR/docker-compose.yml" kill
+  docker compose -f "$REPO_ROOT/docker-compose.yml" kill
 }
 trap cleanup INT TERM
 
 echo "Ready. Following logs (Ctrl+C to stop)..." >&2
-docker compose -f "$SCRIPT_DIR/docker-compose.yml" logs -f
+docker compose -f "$REPO_ROOT/docker-compose.yml" logs -f
