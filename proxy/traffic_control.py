@@ -4,6 +4,8 @@ from mitmproxy import http
 
 logger = logging.getLogger(__name__)
 
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
 BLOCKED_URLS = {
     "api.anthropic.com": (
         "/api/claude_code/metrics",
@@ -23,10 +25,7 @@ class TrafficControlAddon:
         logger.info(msg)
         print(msg, flush=True, file=sys.stderr)
 
-        # Skip flows already handled by auth addons
-        if flow.metadata.get("handled"):
-            return
-
+        # Explicit blocks always win, regardless of handled status
         blocked_prefixes = BLOCKED_URLS.get(flow.request.host, ())
         if blocked_prefixes and any(flow.request.path.startswith(p) for p in blocked_prefixes):
             msg = f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}"
@@ -34,6 +33,20 @@ class TrafficControlAddon:
             print(msg, flush=True, file=sys.stderr)
             flow.response = http.Response.make(502)
             return
+
+        # Safe (read-only) methods are allowed to any destination
+        if flow.request.method in SAFE_METHODS:
+            return
+
+        # Auth-handled flows (known API endpoints) are allowed for any method
+        if flow.metadata.get("handled"):
+            return
+
+        # Default deny: unsafe method to unknown destination
+        msg = f"[BLOCKED] {flow.request.method} {flow.request.pretty_url}"
+        logger.info(msg)
+        print(msg, flush=True, file=sys.stderr)
+        flow.response = http.Response.make(502)
 
     def response(self, flow: http.HTTPFlow) -> None:
         msg = f"<<< {flow.response.status_code} {flow.request.pretty_url}"

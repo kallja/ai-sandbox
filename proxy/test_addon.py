@@ -132,9 +132,47 @@ class TestBlockedUrls:
         tc_addon.request(flow)
         assert flow.response is None
 
-    def test_skips_handled_flows(self, tc_addon):
-        """Flows already handled by auth addons are not blocked."""
+    def test_blocked_urls_override_handled_flag(self, tc_addon):
+        """Blocked URLs are blocked even if marked handled (defense-in-depth)."""
         flow = make_flow("GET", "https://api.anthropic.com/api/claude_code/metrics")
+        flow.metadata["handled"] = True
+        tc_addon.request(flow)
+        assert flow.response.status_code == 502
+
+
+# ---------------------------------------------------------------------------
+# Tests: traffic control — default deny for unsafe methods
+# ---------------------------------------------------------------------------
+
+class TestDefaultDeny:
+    def test_post_to_unknown_host_blocked(self, tc_addon):
+        flow = make_flow("POST", "https://example.com/api/data")
+        tc_addon.request(flow)
+        assert flow.response.status_code == 502
+
+    def test_put_to_unknown_host_blocked(self, tc_addon):
+        flow = make_flow("PUT", "https://example.com/api/data")
+        tc_addon.request(flow)
+        assert flow.response.status_code == 502
+
+    def test_get_to_unknown_host_allowed(self, tc_addon):
+        flow = make_flow("GET", "https://example.com/something")
+        tc_addon.request(flow)
+        assert flow.response is None
+
+    def test_head_to_unknown_host_allowed(self, tc_addon):
+        flow = make_flow("HEAD", "https://example.com/something")
+        tc_addon.request(flow)
+        assert flow.response is None
+
+    def test_options_to_unknown_host_allowed(self, tc_addon):
+        flow = make_flow("OPTIONS", "https://example.com/something")
+        tc_addon.request(flow)
+        assert flow.response is None
+
+    def test_handled_unsafe_method_allowed(self, tc_addon):
+        """Auth-handled flows are allowed even for unsafe methods."""
+        flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
         flow.metadata["handled"] = True
         tc_addon.request(flow)
         assert flow.response is None
@@ -369,9 +407,16 @@ class TestAddonPipeline:
         tc_addon.request(flow)
         assert flow.response.status_code == 502
 
-    def test_unknown_traffic_passes_through(self, auth_addon, tc_addon):
-        """Unknown hosts pass through both addons untouched."""
+    def test_unknown_get_passes_through(self, auth_addon, tc_addon):
+        """GET to unknown hosts passes through both addons."""
         flow = make_flow("GET", "https://example.com/something")
         auth_addon.request(flow)
         tc_addon.request(flow)
         assert flow.response is None
+
+    def test_unknown_post_blocked(self, auth_addon, tc_addon):
+        """POST to unknown hosts is blocked by traffic control."""
+        flow = make_flow("POST", "https://example.com/api/data")
+        auth_addon.request(flow)
+        tc_addon.request(flow)
+        assert flow.response.status_code == 502
