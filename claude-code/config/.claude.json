@@ -1,4 +1,9 @@
 {
   "numStartups": 1,
-  "hasCompletedOnboarding": true
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "/repo": {
+      "hasTrustDialogAccepted": true
+    }
+  }
 }

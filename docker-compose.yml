@@ -13,22 +13,6 @@ services:
       - mitmproxy-data:/home/mitmproxy/.mitmproxy
       - shared-certs:/shared-certs
 
-  # client:
-  #   build: ./client
-  #   environment:
-  #     - HTTP_PROXY=http://proxy.local:8080
-  #     - HTTPS_PROXY=http://proxy.local:8080
-  #     - http_proxy=http://proxy.local:8080
-  #     - https_proxy=http://proxy.local:8080
-  #   networks:
-  #     - internal_only
-  #   volumes:
-  #     - shared-certs:/shared-certs:ro
-  #   depends_on:
-  #     - proxy
-  #     - public-test-server
-  #     - internal-test-server
-
   claude-code:
     build: ./claude-code
     environment:
@@ -42,31 +26,11 @@ services:
       - internal_only
     volumes:
       - shared-certs:/shared-certs:ro
-      # - ~/.claude:/root/.claude:ro
+      - .:/repo
+      - claude-memory:/root/.claude/projects
+    working_dir: /repo
     depends_on:
       - proxy
-
-  # public-test-server:
-  #   build: ./test-server
-  #   environment:
-  #     - PORT=80
-  #   # ports:
-  #   #   - "127.0.0.1:3000:80"
-  #   networks:
-  #     public:
-  #       aliases:
-  #         - public-server.local
-
-  # internal-test-server:
-  #   build: ./test-server
-  #   environment:
-  #     - PORT=80
-  #   # ports:
-  #   #   - "127.0.0.1:3000:80"
-  #   networks:
-  #     internal_only:
-  #       aliases:
-  #         - internal-server.local
 
 networks:
   internal_only:
@@ -77,3 +41,4 @@ networks:
 volumes:
   mitmproxy-data:
   shared-certs:
+  claude-memory:
