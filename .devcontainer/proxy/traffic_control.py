@@ -15,6 +15,9 @@ RULES = {
     "raw.githubusercontent.com": [
         rule.path_starts_with("/anthropics/").then("deny"),
     ],
+    "github.com": [
+        rule.path_starts_with("/anthropics/").then("deny"),
+    ],
     "storage.googleapis.com": [
         rule.path_starts_with("/claude-code-").then("deny"),
     ],
