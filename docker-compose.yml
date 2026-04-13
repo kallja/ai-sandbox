@@ -1,8 +1,7 @@
 services:
   proxy:
     build:
-      context: .
-      dockerfile: proxy/Dockerfile
+      context: ./proxy
     ports:
       - "127.0.0.1:8081:8081" # mitmweb UI
     networks:
@@ -14,26 +13,6 @@ services:
       - mitmproxy-data:/home/mitmproxy/.mitmproxy
       - shared-certs:/shared-certs
 
-  claude:
-    build:
-      context: .
-      dockerfile: claude-code/Dockerfile
-    environment:
-      - HTTP_PROXY=http://proxy.local:8080
-      - HTTPS_PROXY=http://proxy.local:8080
-      - http_proxy=http://proxy.local:8080
-      - https_proxy=http://proxy.local:8080
-      - NODE_EXTRA_CA_CERTS=/shared-certs/mitmproxy-ca-cert.pem
-    networks:
-      - internal_only
-    volumes:
-      - shared-certs:/shared-certs:ro
-      - .:/home/claude/repo
-      - claude-memory:/home/claude/.claude/projects
-    working_dir: /home/claude/repo
-    depends_on:
-      - proxy
-
 networks:
   internal_only:
     internal: true
@@ -43,4 +22,3 @@ networks:
 volumes:
   mitmproxy-data:
   shared-certs:
-  claude-memory:

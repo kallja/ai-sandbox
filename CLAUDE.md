@@ -1,11 +1,11 @@
 # ai-sandbox
 
-Docker-based sandbox for running Claude Code CLI with network isolation, traffic interception, and credential proxy injection.
+Produces a proxy container (mitmproxy + Python addons) for intercepting and controlling Claude Code CLI traffic. Handles OAuth credential injection, auth header management, and default-deny traffic control.
 
 ## Architecture
 
-- **proxy** — mitmproxy that intercepts all HTTPS traffic from the Claude container. Injects real auth credentials into API requests while only exposing fake tokens to the CLI. Enforces traffic control rules (default-deny for POST/PUT/DELETE).
-- **claude** — Runs Claude Code CLI as non-root user. All network traffic routes through the proxy via `internal_only` network (no direct internet access).
+- **proxy** (the product) — mitmproxy that intercepts all HTTPS traffic. Injects real auth credentials into API requests while only exposing fake tokens to the CLI. Enforces traffic control rules (default-deny for POST/PUT/DELETE).
+- **devcontainer** (for development) — Claude Code CLI container in `.devcontainer/` that routes traffic through the proxy via `internal_only` network.
 - Two networks: `internal_only` (no external access) and `public` (proxy web UI only).
 - Credentials are extracted from macOS Keychain on the host and injected into the proxy container at runtime.
 
@@ -14,15 +14,15 @@ Docker-based sandbox for running Claude Code CLI with network isolation, traffic
 From the host (macOS):
 
 ```
-./scripts/start.sh          # Start everything, inject credentials, follow logs
-./scripts/run-claude.sh     # Run Claude CLI in the container (starts services if needed)
+./scripts/start.sh                  # Start proxy, inject credentials, follow logs
+.devcontainer/run-claude.sh         # Run Claude CLI in devcontainer (starts services if needed)
 ```
 
 mitmweb UI is at http://localhost:8081 when running.
 
 ## Testing
 
-Proxy addon tests (run inside the claude container or any environment with pytest):
+Proxy addon tests (run inside the devcontainer):
 
 ```
 pytest proxy/
@@ -33,9 +33,10 @@ pytest proxy/
 - `proxy/claude_auth.py` — OAuth token swapping and auth header injection
 - `proxy/traffic_control.py` — Request allow/deny rules
 - `proxy/rule.py` — Rule matching DSL
-- `claude-code/Dockerfile` — Claude CLI container image
-- `claude-code/config/` — Pre-baked Claude CLI settings (bypass permissions, skip onboarding)
-- `scripts/start.sh` — Host-side startup with Keychain credential extraction
+- `proxy/Dockerfile` — Proxy container image (self-contained build context)
+- `.devcontainer/Dockerfile` — Devcontainer image (Claude CLI + dev tools)
+- `.devcontainer/config/` — Pre-baked Claude CLI settings (bypass permissions, skip onboarding)
+- `scripts/start.sh` — Host-side proxy startup with Keychain credential extraction
 
 ## Worktrees
 

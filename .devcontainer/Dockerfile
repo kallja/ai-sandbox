@@ -19,12 +19,12 @@ RUN apt install -y --no-install-recommends \
     openssl \
     python3 python3-pip
 
-COPY proxy/requirements.txt /tmp/requirements.txt
+COPY requirements-dev.txt /tmp/requirements-dev.txt
 RUN \
-    pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
+    pip install --no-cache-dir --break-system-packages -r /tmp/requirements-dev.txt \
+    && rm /tmp/requirements-dev.txt
 
-COPY claude-code/config/ /home/claude/
+COPY config/ /home/claude/
 
 RUN \
     addgroup --gid 1000 claude \
@@ -32,7 +32,7 @@ RUN \
     && mkdir -p /home/claude/.claude/projects \
     && chown -R claude:claude /home/claude/
 
-COPY claude-code/entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

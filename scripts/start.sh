@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start the proxy-test environment and inject credentials.
+# Start the proxy and inject credentials.
 # Runs on the HOST (macOS).
 #
 # Usage:
@@ -9,16 +9,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "Starting proxy-test services..." >&2
+echo "Starting proxy..." >&2
 docker compose -f "$REPO_ROOT/docker-compose.yml" up -d --build --force-recreate
 
 DC="docker compose -f $REPO_ROOT/docker-compose.yml"
-
-# echo "Copying Claude config into claude-code container..." >&2
-# [ -f ~/.claude/settings.json ] && cat ~/.claude/settings.json | $DC exec -T claude-code \
-#   bash -c 'mkdir -p ~/.claude && cat > ~/.claude/settings.json'
-# [ -f ~/.claude.json ] && cat ~/.claude.json | $DC exec -T claude-code \
-#   bash -c 'cat > ~/.claude.json'
 
 echo "Extracting Claude Code credentials from macOS Keychain..." >&2
 CREDS_JSON="$(security find-generic-password \
@@ -34,29 +28,15 @@ To fix this, log in with Claude Code on this machine:
 
 Then re-run this script.
 MSG
-  # exit 1
 else
   printf '%s' "$CREDS_JSON" | $DC exec -T proxy \
     bash -c 'mkdir -p ~/.config/proxy/secrets && cat > ~/.config/proxy/secrets/claude.json'
-  printf '%s' "$CREDS_JSON" \
-  | jq '{
-    claudeAiOauth: {
-      accessToken: "proxy-injected-accessToken",
-      refreshToken: "proxy-injected-refreshToken",
-      expiresAt: .claudeAiOauth.expiresAt,
-      scopes: .claudeAiOauth.scopes,
-      subscriptionType: .claudeAiOauth.subscriptionType,
-      rateLimitTier: .claudeAiOauth.rateLimitTier
-    }
-  }'\
-  | $DC exec -T claude-code \
-    bash -c 'mkdir -p /home/claude/.claude && cat > /home/claude/.claude/.credentials.json && chown -R claude:claude /home/claude/.claude'
-  echo "Credentials injected into containers." >&2
+  echo "Credentials injected into proxy." >&2
 fi
 
 cleanup() {
   echo "" >&2
-  echo "Stopping proxy-test services..." >&2
+  echo "Stopping proxy..." >&2
   docker compose -f "$REPO_ROOT/docker-compose.yml" kill
 }
 trap cleanup INT TERM
