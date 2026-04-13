@@ -23,22 +23,7 @@ if ! $DC ps --status running claude --quiet 2>/dev/null | grep -q .; then
   if [ -f "$SECRETS_FILE" ] && [ "$(cat "$SECRETS_FILE")" != "{}" ]; then
     cat "$SECRETS_FILE" | $DC exec -T proxy \
       bash -c 'mkdir -p ~/.config/proxy/secrets && cat > ~/.config/proxy/secrets/claude.json'
-
-    # Inject sanitized credentials into claude container
-    cat "$SECRETS_FILE" \
-    | jq '{
-      claudeAiOauth: {
-        accessToken: "proxy-injected-accessToken",
-        refreshToken: "proxy-injected-refreshToken",
-        expiresAt: .claudeAiOauth.expiresAt,
-        scopes: .claudeAiOauth.scopes,
-        subscriptionType: .claudeAiOauth.subscriptionType,
-        rateLimitTier: .claudeAiOauth.rateLimitTier
-      }
-    }'\
-    | $DC exec -T claude \
-      bash -c 'mkdir -p /home/claude/.claude && cat > /home/claude/.claude/.credentials.json && chown -R claude:claude /home/claude/.claude'
-    echo "Credentials injected." >&2
+    echo "Credentials injected into proxy." >&2
   else
     echo "Warning: No credentials available. Run 'claude login' on the host first." >&2
   fi
