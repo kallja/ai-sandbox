@@ -1,8 +1,7 @@
 services:
   claude:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: .devcontainer
     environment:
       - HTTP_PROXY=http://proxy.local:8080
       - HTTPS_PROXY=http://proxy.local:8080
@@ -13,7 +12,7 @@ services:
       - internal_only
     volumes:
       - shared-certs:/shared-certs:ro
-      - ..:/home/claude/repo
+      - .:/home/claude/repo
       - claude-memory:/home/claude/.claude/projects
     working_dir: /home/claude/repo
     depends_on:
