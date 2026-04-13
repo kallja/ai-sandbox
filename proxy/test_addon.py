@@ -132,12 +132,12 @@ class TestBlockedUrls:
         tc_addon.request(flow)
         assert flow.response is None
 
-    def test_blocked_urls_override_handled_flag(self, tc_addon):
-        """Blocked URLs are blocked even if marked handled (defense-in-depth)."""
+    def test_handled_flag_overrides_blocked_urls(self, tc_addon):
+        """Auth-handled flows pass through even if the URL would otherwise be blocked."""
         flow = make_flow("GET", "https://api.anthropic.com/api/claude_code/metrics")
         flow.metadata["handled"] = True
         tc_addon.request(flow)
-        assert flow.response.status_code == 502
+        assert flow.response is None
 
 
 # ---------------------------------------------------------------------------

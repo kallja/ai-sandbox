@@ -7,15 +7,16 @@ logger = logging.getLogger(__name__)
 
 RULES = {
     "api.anthropic.com": [
-        rule.path_starts_with(
-            "/api/claude_code/metrics",
-            "/api/claude_code/organization/metrics",
-            "/api/claude_code/organizations/metrics_enabled",
-            "/api/claude_code/settings",
-            "/api/event_logging",
-            "/mcp-registry",
-            "/v1/mcp_servers",
-        ).then("deny"),
+        rule.path_starts_with("/").then("deny"),
+    ],
+    "downloads.claude.ai": [
+        rule.path_starts_with("/").then("deny"),
+    ],
+    "raw.githubusercontent.com": [
+        rule.path_starts_with("/anthropics/").then("deny"),
+    ],
+    "storage.googleapis.com": [
+        rule.path_starts_with("/claude-code-").then("deny"),
     ],
     "*": [
         rule.method_one_of(["get", "head", "options"]).then("allow"),
@@ -45,14 +46,14 @@ class TrafficControlAddon:
 
     @staticmethod
     def _evaluate(flow: http.HTTPFlow) -> str | None:
-        """Evaluate rules: host-specific first, then handled check, then wildcard."""
+        """Evaluate rules: handled check first, then host-specific, then wildcard."""
+        if flow.metadata.get("handled"):
+            return "allow"
         host = flow.request.host
         for r in RULES.get(host, []):
             action = r.evaluate(flow)
             if action is not None:
                 return action
-        if flow.metadata.get("handled"):
-            return "allow"
         for r in RULES.get("*", []):
             action = r.evaluate(flow)
             if action is not None:
