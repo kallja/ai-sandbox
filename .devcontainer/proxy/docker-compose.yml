@@ -1,0 +1,17 @@
+services:
+  proxy:
+    build:
+      # Resolved from .devcontainer/ (first compose file's dir), not this file's dir
+      context: ./proxy
+    ports:
+      - "127.0.0.1:8082:8081" # mitmweb UI
+    networks:
+      public:
+      internal_only:
+        aliases:
+          - proxy.local
+networks:
+  internal_only:
+    internal: true
+  public:
+    driver: bridge
