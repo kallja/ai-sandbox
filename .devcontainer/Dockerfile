@@ -15,7 +15,6 @@ RUN mkdir -p /home/claude \
 RUN apt install -y --no-install-recommends \
     ca-certificates \
     git \
-    gosu \
     openssl \
     python3 python3-pip
 
@@ -26,14 +25,14 @@ RUN \
 
 COPY config/ /home/claude/
 
+COPY --from=certs mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
+RUN update-ca-certificates --fresh
+
 RUN \
     addgroup --gid 1000 claude \
     && adduser --disabled-password --gecos "" --uid 1000 --ingroup claude claude \
     && mkdir -p /home/claude/.claude/projects \
     && chown -R claude:claude /home/claude/
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
+USER claude
 CMD ["sleep", "infinity"]

@@ -9,16 +9,8 @@ services:
       internal_only:
         aliases:
           - proxy.local
-    volumes:
-      - mitmproxy-data:/home/mitmproxy/.mitmproxy
-      - shared-certs:/shared-certs
-
 networks:
   internal_only:
     internal: true
   public:
     driver: bridge
-
-volumes:
-  mitmproxy-data:
-  shared-certs:

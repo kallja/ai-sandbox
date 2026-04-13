@@ -13,7 +13,8 @@ DC="docker compose -f $REPO_ROOT/docker-compose.yml -f $SCRIPT_DIR/docker-compos
 if ! $DC ps --status running claude --quiet 2>/dev/null | grep -q .; then
   echo "Container not running. Starting services..." >&2
 
-  # Extract credentials before starting containers
+  # Generate proxy CA certs if needed, then extract credentials
+  "$REPO_ROOT/scripts/generate-certs.sh"
   "$SCRIPT_DIR/extract-credentials.sh"
 
   $DC up -d --build --force-recreate

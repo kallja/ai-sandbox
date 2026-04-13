@@ -2,6 +2,5 @@
   "dockerComposeFile": ["../docker-compose.yml", "docker-compose.yml"],
   "service": "claude",
   "workspaceFolder": "/home/claude/repo",
-  "initializeCommand": ".devcontainer/extract-credentials.sh",
-  "postStartCommand": ".devcontainer/setup-proxy-certs.sh"
+  "initializeCommand": ".devcontainer/extract-credentials.sh"
 }

@@ -13,19 +13,10 @@ else
   echo "No Cloudflare WARP certificate found, using system CAs only"
 fi
 
-mitmweb --web-host 0.0.0.0 --listen-port 8080 \
-  --set confdir=/home/mitmproxy/.mitmproxy \
+exec mitmweb --web-host 0.0.0.0 --listen-port 8080 \
+  --set confdir=/opt/mitmproxy \
   --set ssl_verify_upstream_trusted_ca="$CA_BUNDLE" \
   --no-web-open-browser \
   --set web_password='$argon2i$v=19$m=8,t=1,p=1$YWFhYWFhYWE$nXD9kg' \
   --set termlog_verbosity=info \
-  -s /addon.py &
-
-while [ ! -f /home/mitmproxy/.mitmproxy/mitmproxy-ca-cert.pem ]; do
-  sleep 0.5
-done
-
-cp /home/mitmproxy/.mitmproxy/mitmproxy-ca-cert.pem /shared-certs/mitmproxy-ca-cert.pem
-echo "CA cert published to shared volume"
-
-wait
+  -s /addon.py

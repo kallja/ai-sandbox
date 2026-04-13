@@ -9,6 +9,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+"$SCRIPT_DIR/generate-certs.sh"
+
 echo "Starting proxy..." >&2
 docker compose -f "$REPO_ROOT/docker-compose.yml" up -d --build --force-recreate
 
