@@ -29,4 +29,10 @@ if ! $DC ps --status running claude --quiet 2>/dev/null | grep -q .; then
   fi
 fi
 
+if [ "${1:-}" = "stop" ]; then
+  echo "Stopping all services..." >&2
+  $DC kill
+  exit 0
+fi
+
 $DC exec -u claude claude "${@:-claude}"
