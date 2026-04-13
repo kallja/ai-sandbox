@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DC="docker compose -f $REPO_ROOT/docker-compose.yml"
 
-if ! $DC ps --status running claude-code --quiet 2>/dev/null | grep -q .; then
+if ! $DC ps --status running claude --quiet 2>/dev/null | grep -q .; then
   echo "Container not running. Starting services..." >&2
   $DC up -d --build --force-recreate
 
@@ -30,10 +30,10 @@ if ! $DC ps --status running claude-code --quiet 2>/dev/null | grep -q .; then
         rateLimitTier: .claudeAiOauth.rateLimitTier
       }
     }'\
-    | $DC exec -T claude-code \
+    | $DC exec -T claude \
       bash -c 'mkdir -p /home/claude/.claude && cat > /home/claude/.claude/.credentials.json && chown -R claude:claude /home/claude/.claude'
     echo "Credentials injected." >&2
   fi
 fi
 
-$DC exec -u claude claude-code "${@:-claude}"
+$DC exec -u claude claude "${@:-claude}"

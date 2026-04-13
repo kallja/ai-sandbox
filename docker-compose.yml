@@ -14,7 +14,7 @@ services:
       - mitmproxy-data:/home/mitmproxy/.mitmproxy
       - shared-certs:/shared-certs
 
-  claude-code:
+  claude:
     build:
       context: .
       dockerfile: claude-code/Dockerfile
