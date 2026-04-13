@@ -189,10 +189,12 @@ class TestAuthInjection:
         assert flow.request.headers.get("Authorization") == "Bearer real-access-token"
         assert flow.metadata.get("handled") is True
 
-    def test_injects_auth_header_on_bootstrap(self, auth_addon, creds_path):
+    def test_no_injection_on_bootstrap(self, auth_addon, creds_path):
+        """Bootstrap path is not auth-handled; traffic control will block it."""
         flow = make_flow("GET", "https://api.anthropic.com/api/claude_cli/bootstrap")
         auth_addon.request(flow)
-        assert flow.request.headers.get("Authorization") == "Bearer real-access-token"
+        assert "Authorization" not in flow.request.headers
+        assert flow.metadata.get("handled") is None
 
     def test_no_injection_without_credentials(self, auth_addon, no_creds):
         flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
