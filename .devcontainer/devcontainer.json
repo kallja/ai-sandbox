@@ -1,5 +1,5 @@
 {
-  "dockerComposeFile": ["../docker-compose.yml", "docker-compose.yml"],
+  "dockerComposeFile": ["docker-compose.yml", "proxy/docker-compose.yml"],
   "service": "claude",
   "workspaceFolder": "/home/claude/repo",
   "initializeCommand": ".devcontainer/extract-credentials.sh"

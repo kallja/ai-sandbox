@@ -14,7 +14,6 @@ Produces a proxy container (mitmproxy + Python addons) for intercepting and cont
 From the host (macOS):
 
 ```
-./scripts/start.sh                  # Start proxy, inject credentials, follow logs
 .devcontainer/run-claude.sh         # Run Claude CLI in devcontainer (starts services if needed)
 ```
 
@@ -36,7 +35,6 @@ pytest proxy/
 - `proxy/Dockerfile` — Proxy container image (self-contained build context)
 - `.devcontainer/Dockerfile` — Devcontainer image (Claude CLI + dev tools)
 - `.devcontainer/config/` — Pre-baked Claude CLI settings (bypass permissions, skip onboarding)
-- `scripts/start.sh` — Host-side proxy startup with Keychain credential extraction
 
 ## Worktrees
 

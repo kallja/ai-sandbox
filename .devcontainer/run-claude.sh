@@ -8,13 +8,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DC="docker compose -f $REPO_ROOT/docker-compose.yml -f $SCRIPT_DIR/docker-compose.yml"
+DC="docker compose -f $SCRIPT_DIR/docker-compose.yml -f $SCRIPT_DIR/proxy/docker-compose.yml"
 
 if ! $DC ps --status running claude --quiet 2>/dev/null | grep -q .; then
   echo "Container not running. Starting services..." >&2
 
   # Generate proxy CA certs if needed, then extract credentials
-  "$REPO_ROOT/scripts/generate-certs.sh"
+  "$SCRIPT_DIR/proxy/generate-certs.sh"
   "$SCRIPT_DIR/extract-credentials.sh"
 
   $DC up -d --build --force-recreate

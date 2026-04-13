@@ -25,7 +25,7 @@ RUN \
 
 COPY config/ /home/claude/
 
-COPY --from=certs mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
+COPY proxy/certs/mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
 RUN update-ca-certificates --fresh
 
 RUN \

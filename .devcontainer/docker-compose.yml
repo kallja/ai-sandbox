@@ -1,9 +1,7 @@
 services:
   claude:
     build:
-      context: .devcontainer
-      additional_contexts:
-        certs: ./proxy/certs
+      context: .
     environment:
       - HTTP_PROXY=http://proxy.local:8080
       - HTTPS_PROXY=http://proxy.local:8080
@@ -12,7 +10,7 @@ services:
     networks:
       - internal_only
     volumes:
-      - .:/home/claude/repo
+      - ..:/home/claude/repo
       - claude-memory:/home/claude/.claude/projects
     working_dir: /home/claude/repo
     depends_on:
