@@ -23,7 +23,7 @@ RUN \
     pip install --no-cache-dir --break-system-packages -r /tmp/requirements-dev.txt \
     && rm /tmp/requirements-dev.txt
 
-COPY config/ /home/claude/
+COPY config/claude/ /home/claude/
 
 COPY proxy/certs/mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
 RUN update-ca-certificates --fresh
