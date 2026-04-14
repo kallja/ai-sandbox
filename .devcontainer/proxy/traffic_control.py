@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 RULES = {
     "api.anthropic.com": [
+        rule.path_starts_with("/api/hello").then("allow"),
         rule.path_starts_with("/").then("deny"),
     ],
     "downloads.claude.ai": [
