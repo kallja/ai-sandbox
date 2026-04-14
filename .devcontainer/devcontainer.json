@@ -2,5 +2,5 @@
   "dockerComposeFile": ["docker-compose.yml", "proxy/docker-compose.yml"],
   "service": "claude",
   "workspaceFolder": "${localWorkspaceFolder}",
-  "initializeCommand": ".devcontainer/proxy/generate-certs.sh"
+  "initializeCommand": ".devcontainer/scripts/initialize.sh"
 }

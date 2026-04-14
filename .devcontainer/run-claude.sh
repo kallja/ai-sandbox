@@ -6,10 +6,4 @@
 #   .devcontainer/run-claude.sh [claude args...]
 set -euo pipefail
 
-source .devcontainer/common.sh
-
-COMPOSE_PROJECT_NAME="$PREFIX" devcontainer up --workspace-folder "$REPO_ROOT"
-
-.devcontainer/inject-credentials.sh
-
-devcontainer exec --workspace-folder "$REPO_ROOT" claude "${@:-}"
+"$(dirname "$0")/run.sh" claude

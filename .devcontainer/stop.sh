@@ -2,7 +2,7 @@
 # Tears down all services. Kill first for speed, then down to clean up.
 set -euo pipefail
 
-source .devcontainer/common.sh
+source "$(dirname "$0")/scripts/common.sh"
 
 echo "Stopping all services..." >&2
 $DC kill
