@@ -10,7 +10,6 @@ services:
     networks:
       - internal_only
     volumes:
-      - ..:/home/claude/repo
       - ${PWD}:${PWD}
       - claude-memory:/home/claude/.claude/projects
     working_dir: ${PWD}
