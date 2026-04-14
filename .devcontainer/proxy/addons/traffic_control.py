@@ -5,25 +5,27 @@ from rule import rule
 
 logger = logging.getLogger(__name__)
 
+
+
 RULES = {
     "api.anthropic.com": [
-        rule.path_starts_with("/api/hello").then("allow"),
-        rule.path_starts_with("/").then("deny"),
+        rule.path.starts_with("/api/hello").then("allow"),
+        rule.path.starts_with("/").then("deny"),
     ],
     "downloads.claude.ai": [
-        rule.path_starts_with("/").then("deny"),
+        rule.path.starts_with("/").then("deny"),
     ],
     "raw.githubusercontent.com": [
-        rule.path_starts_with("/anthropics/").then("deny"),
+        rule.path.starts_with("/anthropics/").then("deny"),
     ],
     "github.com": [
-        rule.path_starts_with("/anthropics/").then("deny"),
+        rule.path.starts_with("/anthropics/").then("deny"),
     ],
     "storage.googleapis.com": [
-        rule.path_starts_with("/claude-code-").then("deny"),
+        rule.path.starts_with("/claude-code-").then("deny"),
     ],
     "*": [
-        rule.method_one_of(["get", "head", "options"]).then("allow"),
+        rule.method.one_of(["get", "head", "options"]).then("allow"),
         rule.then("deny"),
     ],
 }
