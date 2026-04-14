@@ -4,7 +4,7 @@ services:
       # Resolved from .devcontainer/ (first compose file's dir), not this file's dir
       context: ./proxy
     ports:
-      - "127.0.0.1:8082:8081" # mitmweb UI
+      - "127.0.0.1:8081:8081" # mitmweb UI
     networks:
       public:
       internal_only:
