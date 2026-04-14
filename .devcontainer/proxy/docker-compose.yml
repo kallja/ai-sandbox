@@ -5,6 +5,10 @@ services:
       context: ./proxy
     ports:
       - "127.0.0.1:${PROXY_UI_PORT:-8081}:8081" # mitmweb UI
+    environment:
+      # If no hash is provided, Mitmproxy generates a random password that isn't shown anywhere effectively disabling web access.
+      # If provided, PASSWORD_HASH must be a valid Argon2i hash string.
+      - PASSWORD_HASH=${PASSWORD_HASH:-""} 
     networks:
       public:
       internal_only:
