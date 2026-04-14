@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-CERT_DIR="$(cd "$(dirname "$0")" && pwd)/certs"
+CERT_DIR="$(cd "$(dirname "$0")/.." && pwd)/certs"
 mkdir -p "$CERT_DIR"
 
 if [ -f "$CERT_DIR/mitmproxy-ca-cert.pem" ]; then
