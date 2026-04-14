@@ -6,8 +6,8 @@ RUN update-ca-certificates
 
 COPY certs/mitmproxy-ca.pem certs/mitmproxy-ca-cert.pem /home/mitmproxy/.mitmproxy/
 
-COPY --chmod=755 entrypoint.sh /entrypoint.sh
-COPY addon.py claude_auth.py traffic_control.py rule.py /addons/
+COPY --chmod=755 scripts/entrypoint.sh /entrypoint.sh
+COPY addons/ /addons/
 
 USER mitmproxy
 

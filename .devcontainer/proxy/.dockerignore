@@ -9,3 +9,4 @@
 proxy/.venv
 
 **/test_*.py
+**/requirements.txt
