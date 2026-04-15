@@ -2,5 +2,6 @@
   "dockerComposeFile": ["docker-compose.yml", "proxy/docker-compose.yml"],
   "service": "claude",
   "workspaceFolder": "${localWorkspaceFolder}",
-  "initializeCommand": ".devcontainer/scripts/initialize.sh"
+  "initializeCommand": ".devcontainer/scripts/initialize.sh",
+  "postCreateCommand": ".devcontainer/scripts/post-create.sh"
 }

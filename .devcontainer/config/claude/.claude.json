@@ -2,7 +2,7 @@
   "numStartups": 1,
   "hasCompletedOnboarding": true,
   "projects": {
-    "/home/claude/repo": {
+    "__WORKSPACE_ROOT__": {
       "hasTrustDialogAccepted": true
     }
   }
