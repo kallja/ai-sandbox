@@ -4,6 +4,7 @@ from mitmproxy import http
 from mitmproxy.test import taddons, tflow
 
 import claude_auth
+import linear_auth
 import traffic_control
 
 
@@ -19,7 +20,11 @@ SAMPLE_CREDS = {
         "scopes": ["user:inference"],
         "subscriptionType": "pro",
         "rateLimitTier": "tier1",
-    }
+    },
+    "mcpOAuth.linear-server|638130d5ab3558f4": {
+        "accessToken": "linear-access-token",
+        "refreshToken": "linear-refresh-token",
+    },
 }
 
 SAMPLE_TOKEN_RESPONSE = {
@@ -100,6 +105,13 @@ def auth_addon():
 
 
 @pytest.fixture
+def linear_addon():
+    inst = linear_auth.LinearAuthAddon()
+    with taddons.context(inst):
+        yield inst
+
+
+@pytest.fixture
 def tc_addon():
     inst = traffic_control.TrafficControlAddon()
     with taddons.context(inst):
@@ -132,12 +144,35 @@ class TestBlockedUrls:
         tc_addon.request(flow)
         assert flow.response is None
 
-    def test_handled_flag_overrides_blocked_urls(self, tc_addon):
-        """Auth-handled flows pass through even if the URL would otherwise be blocked."""
-        flow = make_flow("GET", "https://api.anthropic.com/api/claude_code/metrics")
-        flow.metadata["handled"] = True
+    def test_claude_auth_rules_allow_api_paths(self, tc_addon):
+        """Claude auth rules explicitly allow API paths that would otherwise be blocked."""
+        flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
         tc_addon.request(flow)
         assert flow.response is None
+
+    def test_claude_auth_rules_allow_token_endpoint(self, tc_addon):
+        """Claude auth rules explicitly allow the token endpoint."""
+        flow = make_flow("POST", "https://platform.claude.com/v1/oauth/token")
+        tc_addon.request(flow)
+        assert flow.response is None
+
+    def test_github_graphql_allowed(self, tc_addon):
+        """GitHub GraphQL API is explicitly allowed."""
+        flow = make_flow("POST", "https://api.github.com/graphql")
+        tc_addon.request(flow)
+        assert flow.response is None
+
+    def test_linear_mcp_post_allowed(self, tc_addon):
+        """POST to Linear MCP endpoint is explicitly allowed."""
+        flow = make_flow("POST", "https://mcp.linear.app/mcp")
+        tc_addon.request(flow)
+        assert flow.response is None
+
+    def test_linear_mcp_get_blocked(self, tc_addon):
+        """GET to Linear MCP endpoint is blocked."""
+        flow = make_flow("GET", "https://mcp.linear.app/mcp")
+        tc_addon.request(flow)
+        assert flow.response.status_code == 502
 
 
 # ---------------------------------------------------------------------------
@@ -170,10 +205,9 @@ class TestDefaultDeny:
         tc_addon.request(flow)
         assert flow.response is None
 
-    def test_handled_unsafe_method_allowed(self, tc_addon):
-        """Auth-handled flows are allowed even for unsafe methods."""
+    def test_claude_auth_allows_unsafe_method_on_allowed_paths(self, tc_addon):
+        """Claude auth rules allow POST to explicitly allowed API paths."""
         flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
-        flow.metadata["handled"] = True
         tc_addon.request(flow)
         assert flow.response is None
 
@@ -187,14 +221,12 @@ class TestAuthInjection:
         flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
         auth_addon.request(flow)
         assert flow.request.headers.get("Authorization") == "Bearer real-access-token"
-        assert flow.metadata.get("handled") is True
 
     def test_no_injection_on_bootstrap(self, auth_addon, creds_path):
         """Bootstrap path is not auth-handled; traffic control will block it."""
         flow = make_flow("GET", "https://api.anthropic.com/api/claude_cli/bootstrap")
         auth_addon.request(flow)
         assert "Authorization" not in flow.request.headers
-        assert flow.metadata.get("handled") is None
 
     def test_no_injection_without_credentials(self, auth_addon, no_creds):
         flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
@@ -205,12 +237,11 @@ class TestAuthInjection:
         flow = make_flow("GET", "https://api.anthropic.com/v1/something-else")
         auth_addon.request(flow)
         assert "Authorization" not in flow.request.headers
-        assert flow.metadata.get("handled") is None
 
     def test_does_not_handle_unknown_hosts(self, auth_addon, creds_path):
         flow = make_flow("GET", "https://example.com/something")
         auth_addon.request(flow)
-        assert flow.metadata.get("handled") is None
+        assert "Authorization" not in flow.request.headers
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +257,6 @@ class TestTokenRequestRefresh:
         assert body["refresh_token"] == "real-refresh-token"
         assert body["grant_type"] == "refresh_token"
         assert flow.metadata.get("proxy_token_request") is True
-        assert flow.metadata.get("handled") is True
 
     def test_swaps_refresh_token_in_form_body(self, auth_addon, creds_path):
         form_body = "grant_type=refresh_token&refresh_token=proxy-injected&client_id=test"
@@ -390,12 +420,38 @@ class TestDryRun:
 
 
 # ---------------------------------------------------------------------------
+# Tests: linear auth — header injection
+# ---------------------------------------------------------------------------
+
+class TestLinearAuthInjection:
+    def test_injects_auth_header_on_mcp(self, linear_addon, creds_path):
+        flow = make_flow("POST", "https://mcp.linear.app/mcp")
+        linear_addon.request(flow)
+        assert flow.request.headers.get("Authorization") == "Bearer linear-access-token"
+
+    def test_no_injection_without_credentials(self, linear_addon, no_creds):
+        flow = make_flow("POST", "https://mcp.linear.app/mcp")
+        linear_addon.request(flow)
+        assert "Authorization" not in flow.request.headers
+
+    def test_no_injection_on_wrong_path(self, linear_addon, creds_path):
+        flow = make_flow("POST", "https://mcp.linear.app/other")
+        linear_addon.request(flow)
+        assert "Authorization" not in flow.request.headers
+
+    def test_no_injection_on_unknown_host(self, linear_addon, creds_path):
+        flow = make_flow("POST", "https://example.com/mcp")
+        linear_addon.request(flow)
+        assert "Authorization" not in flow.request.headers
+
+
+# ---------------------------------------------------------------------------
 # Tests: addon pipeline (auth + traffic control together)
 # ---------------------------------------------------------------------------
 
 class TestAddonPipeline:
     def test_claude_api_not_blocked_by_traffic_control(self, auth_addon, tc_addon, creds_path):
-        """Auth addon marks Claude API flows as handled, so traffic control skips them."""
+        """Claude auth rules explicitly allow API paths, so traffic control passes them."""
         flow = make_flow("POST", "https://api.anthropic.com/v1/messages")
         auth_addon.request(flow)
         tc_addon.request(flow)
@@ -422,3 +478,11 @@ class TestAddonPipeline:
         auth_addon.request(flow)
         tc_addon.request(flow)
         assert flow.response.status_code == 502
+
+    def test_linear_mcp_pipeline(self, linear_addon, tc_addon, creds_path):
+        """Linear auth injects token, traffic control allows POST to /mcp."""
+        flow = make_flow("POST", "https://mcp.linear.app/mcp")
+        linear_addon.request(flow)
+        tc_addon.request(flow)
+        assert flow.response is None
+        assert flow.request.headers.get("Authorization") == "Bearer linear-access-token"

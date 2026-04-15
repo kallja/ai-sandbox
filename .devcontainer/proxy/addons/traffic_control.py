@@ -1,16 +1,24 @@
 import logging
 import sys
 from mitmproxy import http
-from rule import rule
+from rule import rule, FinalizedRule
+from claude_auth import RULES as CLAUDE_AUTH_RULES
+from github_auth import RULES as GITHUB_AUTH_RULES
+from linear_auth import RULES as LINEAR_AUTH_RULES
 
 logger = logging.getLogger(__name__)
 
 
-
-RULES = {
+LOCAL_RULES: dict[str, list[FinalizedRule]] = {
     "api.anthropic.com": [
         rule.path.starts_with("/api/hello").then("allow"),
         rule.path.starts_with("/").then("deny"),
+    ],
+    "api.github.com": [
+        rule.then("deny"),
+    ],
+    "mcp.linear.app": [
+        rule.then("deny"),
     ],
     "downloads.claude.ai": [
         rule.path.starts_with("/").then("deny"),
@@ -29,6 +37,20 @@ RULES = {
         rule.then("deny"),
     ],
 }
+
+
+def _merge_rules(
+    *rule_dicts: dict[str, list[FinalizedRule]]
+) -> dict[str, list[FinalizedRule]]:
+    """Merge rule dicts. Earlier dicts take priority (their rules come first per host)."""
+    merged: dict[str, list[FinalizedRule]] = {}
+    for rd in rule_dicts:
+        for host, rules in rd.items():
+            merged.setdefault(host, []).extend(rules)
+    return merged
+
+
+RULES = _merge_rules(CLAUDE_AUTH_RULES, GITHUB_AUTH_RULES, LINEAR_AUTH_RULES, LOCAL_RULES)
 
 
 def _log(msg: str) -> None:
@@ -52,9 +74,7 @@ class TrafficControlAddon:
 
     @staticmethod
     def _evaluate(flow: http.HTTPFlow) -> str | None:
-        """Evaluate rules: handled check first, then host-specific, then wildcard."""
-        if flow.metadata.get("handled"):
-            return "allow"
+        """Evaluate rules: host-specific first, then wildcard."""
         host = flow.request.host
         for r in RULES.get(host, []):
             action = r.evaluate(flow)

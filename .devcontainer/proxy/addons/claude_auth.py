@@ -5,18 +5,30 @@ import sys
 import time
 from urllib.parse import urlencode, parse_qs
 from mitmproxy import http
+from rule import rule
 
 logger = logging.getLogger(__name__)
 
+CREDENTIALS_PATH = os.path.expanduser("~/.config/proxy/secrets/claude.json")
+
 ANTHROPIC_API_HOST = "api.anthropic.com"
-ANTHROPIC_API_PATHS = (
+ANTHROPIC_API_PATHS = [
     "/api/oauth/profile",
     "/v1/messages",
-)
+]
 TOKEN_HOST = "platform.claude.com"
 TOKEN_PATH = "/v1/oauth/token"
-CREDENTIALS_PATH = os.path.expanduser("~/.config/proxy/secrets/claude.json")
+
 DRY_RUN = False
+
+RULES = {
+    ANTHROPIC_API_HOST: [
+        rule.path.starts_with.one_of(ANTHROPIC_API_PATHS).then("allow")
+    ],
+    TOKEN_HOST: [
+        rule.path.starts_with(TOKEN_PATH).then("allow"),
+    ],
+}
 
 
 def _log(msg: str) -> None:
@@ -55,12 +67,10 @@ class ClaudeAuthAddon:
     def request(self, flow: http.HTTPFlow) -> None:
         if self._is_token_request(flow):
             self._handle_token_request(flow)
-            flow.metadata["handled"] = True
             return
 
         if self._is_anthropic_api(flow):
             self._inject_auth_header(flow)
-            flow.metadata["handled"] = True
 
     def response(self, flow: http.HTTPFlow) -> None:
         if flow.metadata.get("proxy_token_request"):
@@ -94,7 +104,7 @@ class ClaudeAuthAddon:
         if token:
             flow.request.headers["Authorization"] = f"Bearer {token}"
             _log(
-                f"[INJECT] Auth header injected into {flow.request.method} {flow.request.pretty_url}"
+                f"[CLAUDE] Auth header injected into {flow.request.method} {flow.request.pretty_url}"
             )
         else:
             _log(f"[ERROR] No access token available for {flow.request.pretty_url}")
