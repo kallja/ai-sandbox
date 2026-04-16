@@ -162,38 +162,38 @@ Required variables are defined in `variables.tf`. Terraform validates but cannot
 - GCP project with billing enabled
 - Cloudflare zone and API token (set `CLOUDFLARE_API_TOKEN`)
 - GCP credentials configured (`gcloud auth application-default login`)
-- A `prod.tfvars` file with: `gcp_project`, `cloudflare_zone_id`, `domain`, `relay_image`, and optionally `allowed_countries`
+- A `prod.tfvars` file with: `gcp_project`, `cloudflare_zone_id`, `domain`, and optionally `allowed_countries`
 
 ### First deploy
 
+Cloud Run validates the container image at apply time, so the registry must exist and contain the image before Cloud Run can be created. The first deploy is a three-step bootstrap:
+
 ```sh
-# 1. Provision infrastructure
 cd oob-auth/infra
 terraform init
-terraform apply -var-file=prod.tfvars
 
-# 2. Authenticate Docker to Artifact Registry (one-time)
+# 1. Create the registry (and other infra that doesn't need the image)
+terraform apply -var-file=prod.tfvars \
+  -target=google_artifact_registry_repository.relay
+
+# 2. Authenticate Docker and push the relay image
 gcloud auth configure-docker $(terraform output -raw artifact_registry_url | cut -d/ -f1)
-
-# 3. Build and push the relay image
 docker build -t $(terraform output -raw artifact_registry_url)/relay:latest ..
 docker push $(terraform output -raw artifact_registry_url)/relay:latest
 
-# 4. Deploy the image to Cloud Run
-terraform apply -var-file=prod.tfvars \
-  -var="relay_image=$(terraform output -raw artifact_registry_url)/relay:latest"
+# 3. Apply everything (Cloud Run can now find the image)
+terraform apply -var-file=prod.tfvars
 ```
 
 ### Subsequent deploys
 
-Steps 3-4 only — build, push, apply:
+Build, push, apply:
 
 ```sh
 cd oob-auth/infra
 docker build -t $(terraform output -raw artifact_registry_url)/relay:latest ..
 docker push $(terraform output -raw artifact_registry_url)/relay:latest
-terraform apply -var-file=prod.tfvars \
-  -var="relay_image=$(terraform output -raw artifact_registry_url)/relay:latest"
+terraform apply -var-file=prod.tfvars
 ```
 
 ### Notes
