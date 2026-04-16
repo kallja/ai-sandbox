@@ -72,7 +72,7 @@ resource "google_cloud_run_v2_service" "relay" {
     containers {
       image   = local.relay_image
       command = ["relay"]
-      args    = ["--store=firestore", "--gcp-project=${var.gcp_project}", "--addr=:8080"]
+      args    = ["--store=firestore", "--gcp-project=${var.gcp_project}", "--firestore-database=${google_firestore_database.queue.name}", "--addr=:8080"]
 
       ports {
         container_port = 8080
@@ -96,6 +96,15 @@ resource "google_cloud_run_v2_service" "relay" {
   }
 
   ingress = "INGRESS_TRAFFIC_ALL"
+}
+
+# Allow unauthenticated access (auth is handled at the application layer).
+resource "google_cloud_run_v2_service_iam_member" "public" {
+  project  = var.gcp_project
+  location = var.gcp_region
+  name     = google_cloud_run_v2_service.relay.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }
 
 # Store the Cloudflare client secret in Secret Manager so it's not
