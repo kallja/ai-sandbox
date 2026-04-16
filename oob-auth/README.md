@@ -14,12 +14,14 @@ Secure, serverless Out-of-Band OAuth 2.0 authorization flow between two isolated
 | `cmd/relay/` | Binary | Relay server entry point |
 | `cmd/client-a/` | Binary | Requester CLI entry point |
 | `cmd/client-b/` | Binary | Broker CLI entry point |
+| `cmd/keygen/` | Binary | Generates Ed25519 key pairs for requester and broker |
+| `cmd/test-broker/` | Binary | Non-interactive broker for automated testing |
 | `integration/` | Tests | End-to-end tests wiring all three components |
 | `infra/` | Terraform | GCP (Cloud Run, Firestore, IAM) + Cloudflare (DNS, WAF, service tokens) |
 
 ## Prerequisites
 
-- Go 1.24+ (only dependency for building and testing)
+- Go 1.25+ (only dependency for building and testing)
 - Terraform 1.5+ (only needed for infrastructure, not for application development)
 
 ## Building
@@ -27,10 +29,12 @@ Secure, serverless Out-of-Band OAuth 2.0 authorization flow between two isolated
 ```sh
 cd oob-auth
 
-# Build all three binaries
-go build ./cmd/relay/
-go build ./cmd/client-a/
-go build ./cmd/client-b/
+# Build all binaries into bin/
+mkdir -p bin
+go build -o bin/ ./cmd/relay/ \
+  && go build -o bin/ ./cmd/client-a/ \
+  && go build -o bin/ ./cmd/client-b/ \
+  && go build -o bin/ ./cmd/keygen/
 ```
 
 ## Testing
@@ -52,46 +56,43 @@ go test -v ./integration/
 
 All tests run locally against in-memory backends and `httptest` servers. No external services, credentials, or network access required.
 
-## Running locally
+## Using the clients
 
 ### 1. Generate key pairs
 
-Each machine needs an Ed25519 key pair. For local testing, generate both:
+Each machine needs an Ed25519 key pair. Generate both with the keygen tool:
 
 ```sh
-# In a Go program or test, use crypto.GenerateKeyPair() and SavePrivateKey/SavePublicKey.
-# There is no standalone keygen CLI — keys are standard Ed25519 in PEM format (PKCS#8/PKIX).
+bin/keygen --out=keys/
 ```
 
-### 2. Start the relay
+This creates four files in `keys/`:
+- `requester-private.pem`, `requester-public.pem`
+- `broker-private.pem`, `broker-public.pem`
+
+Copy each machine's private key and the other machine's public key to it. Keys are standard Ed25519 PEM (PKCS#8/PKIX).
+
+### 2. Start Client B (Broker) — on the trusted machine
+
+Start client-b first so it's polling when client-a publishes:
 
 ```sh
-./relay --store=memory --addr=:8080
-```
-
-The relay runs with an in-memory store by default (messages expire after 5 minutes). For production, use `--store=firestore --gcp-project=<project>`.
-
-Cloudflare header verification is enabled when `--cf-client-id` and `--cf-client-secret` are set (or via `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` env vars). When both are empty strings, all requests pass through.
-
-### 3. Start Client B (Broker) — on the trusted machine
-
-```sh
-./client-b \
-  --relay=http://localhost:8080 \
+bin/client-b \
+  --relay=https://relay.example.com \
   --key=broker-private.pem \
   --peer-pub=requester-public.pem \
   --mode=code
 ```
 
-Client B long-polls the relay, waiting for an encrypted intent. When one arrives, it presents the OAuth authorization URL and prompts for the auth code.
+Client B long-polls the relay, waiting for an encrypted intent. When one arrives, it prints the OAuth authorization URL. Open it in a browser, complete the flow, and paste back the auth code.
 
-`--mode=code` returns the authorization code to Client A. `--mode=token` redeems it for tokens first.
+`--mode=code` returns the authorization code to Client A (Client A redeems it). `--mode=token` redeems the code for tokens on the broker side and returns tokens directly.
 
-### 4. Start Client A (Requester) — on the standard machine
+### 3. Start Client A (Requester) — on the sandboxed machine
 
 ```sh
-./client-a \
-  --relay=http://localhost:8080 \
+bin/client-a \
+  --relay=https://relay.example.com \
   --auth-url=https://provider.example.com/authorize \
   --token-url=https://provider.example.com/token \
   --client-id=my-oauth-client \
@@ -100,7 +101,19 @@ Client B long-polls the relay, waiting for an encrypted intent. When one arrives
   --peer-pub=broker-public.pem
 ```
 
-Client A encrypts the OAuth intent, publishes it to the relay, and blocks until the Broker returns an encrypted response containing the auth code or tokens.
+Client A encrypts the OAuth intent, publishes it to the relay, and blocks until Client B returns the auth code or tokens.
+
+### Running locally (development)
+
+For local testing, start the relay yourself instead of pointing at a deployed instance:
+
+```sh
+bin/relay --store=memory --addr=:8080
+```
+
+Then use `--relay=http://localhost:8080` for both clients. The in-memory store expires messages after 5 minutes.
+
+Cloudflare header verification is enabled when `--cf-client-id` and `--cf-client-secret` are set (or via `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` env vars). When both are empty, all requests pass through.
 
 ## Docker compose testing
 
