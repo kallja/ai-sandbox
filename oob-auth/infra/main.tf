@@ -2,7 +2,7 @@ terraform {
   required_version = ">= 1.5"
 
   backend "gcs" {
-    bucket = "CHANGE_ME"
+    bucket = "pineappletree-apps-terraform"
     prefix = "oob-auth"
   }
 
