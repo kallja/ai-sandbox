@@ -17,14 +17,18 @@ func Pad(msg []byte, size int) ([]byte, error) {
 }
 
 // Unpad strips ISO 7816-4 padding: scans backwards past 0x00 bytes,
-// expects a 0x01 marker, and returns everything before it.
+// expects a 0x01 marker, and returns a copy of everything before it.
+// The returned slice is independent of the input — callers can safely
+// zero the padded buffer without affecting the result.
 func Unpad(padded []byte) ([]byte, error) {
 	for i := len(padded) - 1; i >= 0; i-- {
 		switch padded[i] {
 		case 0x00:
 			continue
 		case 0x01:
-			return padded[:i], nil
+			result := make([]byte, i)
+			copy(result, padded[:i])
+			return result, nil
 		default:
 			return nil, fmt.Errorf("invalid padding byte at offset %d: 0x%02x", i, padded[i])
 		}

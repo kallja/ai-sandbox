@@ -5,7 +5,9 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -325,4 +327,90 @@ func (t *cfHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	req.Header.Set("CF-Access-Client-Id", t.clientID)
 	req.Header.Set("CF-Access-Client-Secret", t.secret)
 	return t.base.RoundTrip(req)
+}
+
+// TestE2E_ChatMessage verifies bidirectional E2EE messaging: encrypt →
+// publish → subscribe → decrypt, using the same relay and crypto
+// primitives as the OAuth flow.
+func TestE2E_ChatMessage(t *testing.T) {
+	alice, _ := crypto.GenerateKeyPair()
+	bob, _ := crypto.GenerateKeyPair()
+
+	store := relay.NewMemStore()
+	relaySrv := relay.NewServer(store)
+	relayTS := httptest.NewServer(relaySrv.Handler())
+	defer relayTS.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Alice sends a message to Bob.
+	msg := []byte("Hello, Bob! This is an encrypted message.")
+	padded, err := crypto.Pad(msg, protocol.PaddedPlaintextSize)
+	if err != nil {
+		t.Fatalf("Pad: %v", err)
+	}
+	nonce, ciphertext, err := crypto.Seal(padded, alice.Private, bob.Public)
+	if err != nil {
+		t.Fatalf("Seal: %v", err)
+	}
+	crypto.Zero(padded)
+
+	env := &protocol.Envelope{
+		SenderID:   crypto.Fingerprint(alice.Public),
+		Nonce:      nonce[:],
+		Ciphertext: ciphertext,
+	}
+	envData, err := protocol.MarshalEnvelope(env)
+	if err != nil {
+		t.Fatalf("MarshalEnvelope: %v", err)
+	}
+
+	// Verify envelope is exactly 4096 bytes.
+	if len(envData) != protocol.EnvelopeSize {
+		t.Errorf("envelope size = %d, want %d", len(envData), protocol.EnvelopeSize)
+	}
+
+	// Publish to Bob's queue.
+	bobQueueID := crypto.QueueID(bob.Public)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, relayTS.URL+"/api/v1/queue/"+bobQueueID, bytes.NewReader(envData))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("publish status = %d", resp.StatusCode)
+	}
+
+	// Bob subscribes and decrypts.
+	resp, err = http.Get(relayTS.URL + "/api/v1/queue/" + bobQueueID)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	gotEnv, err := protocol.UnmarshalEnvelope(body)
+	if err != nil {
+		t.Fatalf("UnmarshalEnvelope: %v", err)
+	}
+
+	var gotNonce [24]byte
+	copy(gotNonce[:], gotEnv.Nonce)
+	decrypted, err := crypto.Open(gotEnv.Ciphertext, gotNonce, alice.Public, bob.Private)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	unpadded, err := crypto.Unpad(decrypted)
+	crypto.Zero(decrypted)
+	if err != nil {
+		t.Fatalf("Unpad: %v", err)
+	}
+
+	if string(unpadded) != string(msg) {
+		t.Errorf("got %q, want %q", unpadded, msg)
+	}
 }
