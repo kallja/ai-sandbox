@@ -10,7 +10,7 @@ services:
     networks:
       - internal_only
     volumes:
-      - ${PWD}:${PWD}
+      - ${GIT_REPO_ROOT}:${GIT_REPO_ROOT}
       - claude-memory:/home/claude/.claude/projects
     working_dir: ${PWD}
     depends_on:
