@@ -50,14 +50,22 @@ type Envelope struct {
 // It describes the OAuth authorization the Requester wants the Broker
 // to perform on its behalf.
 type Intent struct {
-	AuthURL      string   `json:"auth_url"`
-	TokenURL     string   `json:"token_url"`
-	ClientID     string   `json:"client_id"`
-	Scopes       []string `json:"scopes"`
-	RedirectURI  string   `json:"redirect_uri"`
-	CodeChallenge string  `json:"code_challenge"`
-	ChallengeMethod string `json:"challenge_method"` // Always "S256".
-	State        string   `json:"state"`
+	AuthURL         string   `json:"auth_url"`
+	TokenURL        string   `json:"token_url"`
+	ClientID        string   `json:"client_id"`
+	Scopes          []string `json:"scopes"`
+	RedirectURI     string   `json:"redirect_uri"`
+	CodeChallenge   string   `json:"code_challenge"`
+	ChallengeMethod string   `json:"challenge_method"` // Always "S256".
+	State           string   `json:"state"`
+
+	// Request customization — controls how the Broker formats requests
+	// to the OAuth provider. Optional; nil means use defaults.
+	ExtraParams         map[string]string `json:"extra_params,omitempty"`
+	OrderQueryParams    []string          `json:"order_query_params,omitempty"`
+	RequestHeaders      map[string]string `json:"request_headers,omitempty"`
+	OrderRequestHeaders []string          `json:"order_request_headers,omitempty"`
+	OrderBodyFields     []string          `json:"order_body_fields,omitempty"`
 }
 
 // Response is the cleartext payload sent by Client B (the Broker) back

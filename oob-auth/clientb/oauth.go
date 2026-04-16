@@ -6,10 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/kallja/ai-sandbox/oob-auth/crypto"
 	"github.com/kallja/ai-sandbox/oob-auth/protocol"
+	"github.com/kallja/ai-sandbox/oob-auth/reqconfig"
 )
 
 // OAuthExecutor handles the OAuth authorization flow. In production
@@ -23,10 +25,12 @@ type OAuthExecutor interface {
 
 // TokenRedeemer exchanges an authorization code for tokens.
 type TokenRedeemer interface {
-	// Redeem exchanges an auth code + PKCE verifier for tokens.
-	// Note: the Broker does not have the verifier in the code-relay mode.
-	// When acting in full-token mode, it redeems the code itself.
+	// Redeem exchanges an auth code for tokens using default request formatting.
 	Redeem(ctx context.Context, tokenURL, clientID, authCode, redirectURI string) (*protocol.Response, error)
+
+	// RedeemWithConfig exchanges an auth code for tokens with custom request
+	// formatting (header ordering, body field ordering, extra headers).
+	RedeemWithConfig(ctx context.Context, tokenURL, clientID, authCode, redirectURI string, cfg *reqconfig.Config) (*protocol.Response, error)
 }
 
 // HTTPTokenRedeemer redeems auth codes via HTTP POST to the token endpoint.
@@ -36,18 +40,43 @@ type HTTPTokenRedeemer struct {
 
 // Redeem exchanges an authorization code for tokens at the given token endpoint.
 func (r *HTTPTokenRedeemer) Redeem(ctx context.Context, tokenURL, clientID, authCode, redirectURI string) (*protocol.Response, error) {
-	form := url.Values{
-		"grant_type":   {"authorization_code"},
-		"code":         {authCode},
-		"client_id":    {clientID},
-		"redirect_uri": {redirectURI},
+	return r.RedeemWithConfig(ctx, tokenURL, clientID, authCode, redirectURI, nil)
+}
+
+// RedeemWithConfig exchanges an authorization code for tokens, applying
+// request customization from the config (custom headers, header ordering,
+// body field ordering).
+func (r *HTTPTokenRedeemer) RedeemWithConfig(ctx context.Context, tokenURL, clientID, authCode, redirectURI string, cfg *reqconfig.Config) (*protocol.Response, error) {
+	fields := map[string]string{
+		"grant_type":   "authorization_code",
+		"code":         authCode,
+		"client_id":    clientID,
+		"redirect_uri": redirectURI,
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
+	var bodyStr string
+	if cfg != nil && len(cfg.OrderBodyFields) > 0 {
+		bodyStr = reqconfig.EncodeForm(fields, cfg.OrderBodyFields)
+	} else {
+		bodyStr = reqconfig.EncodeForm(fields, nil)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(bodyStr))
 	if err != nil {
 		return nil, fmt.Errorf("build token request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	// Apply custom headers.
+	if cfg != nil {
+		for k, v := range cfg.RequestHeaders {
+			req.Header.Set(k, v)
+		}
+		// Apply header ordering by rebuilding the header map.
+		if len(cfg.OrderRequestHeaders) > 0 {
+			applyHeaderOrder(req, cfg.OrderRequestHeaders)
+		}
+	}
 
 	resp, err := r.Client.Do(req)
 	if err != nil {
@@ -71,6 +100,36 @@ func (r *HTTPTokenRedeemer) Redeem(ctx context.Context, tokenURL, clientID, auth
 		return nil, fmt.Errorf("parse token response: %w", err)
 	}
 	return tokenResp, nil
+}
+
+// applyHeaderOrder reorders HTTP headers so that keys listed in order
+// appear first. Go's http.Header is a map so iteration order is not
+// guaranteed, but many servers are sensitive to header order in the
+// raw wire format. We rebuild the header map in the desired order.
+func applyHeaderOrder(req *http.Request, order []string) {
+	original := req.Header.Clone()
+	req.Header = make(http.Header)
+	seen := make(map[string]bool)
+
+	for _, key := range order {
+		canonical := http.CanonicalHeaderKey(key)
+		if vals, ok := original[canonical]; ok {
+			req.Header[canonical] = vals
+			seen[canonical] = true
+		}
+	}
+
+	// Append remaining headers alphabetically.
+	var remaining []string
+	for key := range original {
+		if !seen[key] {
+			remaining = append(remaining, key)
+		}
+	}
+	sort.Strings(remaining)
+	for _, key := range remaining {
+		req.Header[key] = original[key]
+	}
 }
 
 // URLPresenter is a simple OAuthExecutor that prints the authorization URL
@@ -106,17 +165,34 @@ func buildAuthURL(intent *protocol.Intent) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse auth URL: %w", err)
 	}
-	q := u.Query()
-	q.Set("response_type", "code")
-	q.Set("client_id", intent.ClientID)
-	q.Set("redirect_uri", intent.RedirectURI)
-	q.Set("code_challenge", intent.CodeChallenge)
-	q.Set("code_challenge_method", intent.ChallengeMethod)
-	q.Set("state", intent.State)
-	if len(intent.Scopes) > 0 {
-		q.Set("scope", strings.Join(intent.Scopes, " "))
+
+	// Collect all query parameters.
+	params := make(map[string]string)
+
+	// Preserve any params already in the base URL.
+	for k, v := range u.Query() {
+		if len(v) > 0 {
+			params[k] = v[0]
+		}
 	}
-	u.RawQuery = q.Encode()
+
+	// Standard OAuth params.
+	params["response_type"] = "code"
+	params["client_id"] = intent.ClientID
+	params["redirect_uri"] = intent.RedirectURI
+	params["code_challenge"] = intent.CodeChallenge
+	params["code_challenge_method"] = intent.ChallengeMethod
+	params["state"] = intent.State
+	if len(intent.Scopes) > 0 {
+		params["scope"] = strings.Join(intent.Scopes, " ")
+	}
+
+	// Extra static params from request config.
+	for k, v := range intent.ExtraParams {
+		params[k] = v
+	}
+
+	u.RawQuery = reqconfig.EncodeQuery(params, intent.OrderQueryParams)
 	return u.String(), nil
 }
 

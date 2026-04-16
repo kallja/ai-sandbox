@@ -12,6 +12,7 @@ import (
 
 	"github.com/kallja/ai-sandbox/oob-auth/crypto"
 	"github.com/kallja/ai-sandbox/oob-auth/protocol"
+	"github.com/kallja/ai-sandbox/oob-auth/reqconfig"
 )
 
 // mockRelay is a minimal relay simulation for broker tests.
@@ -95,6 +96,10 @@ type mockRedeemer struct {
 }
 
 func (m *mockRedeemer) Redeem(ctx context.Context, tokenURL, clientID, authCode, redirectURI string) (*protocol.Response, error) {
+	return m.resp, m.err
+}
+
+func (m *mockRedeemer) RedeemWithConfig(ctx context.Context, tokenURL, clientID, authCode, redirectURI string, _ *reqconfig.Config) (*protocol.Response, error) {
 	return m.resp, m.err
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/kallja/ai-sandbox/oob-auth/crypto"
 	"github.com/kallja/ai-sandbox/oob-auth/protocol"
+	"github.com/kallja/ai-sandbox/oob-auth/reqconfig"
 )
 
 // Config holds the settings for a Broker session.
@@ -70,7 +71,12 @@ func Run(ctx context.Context, cfg *Config, client *http.Client, auth OAuthExecut
 	// Build the response.
 	var resp *protocol.Response
 	if cfg.Mode == "token" && redeemer != nil && intent.TokenURL != "" {
-		resp, err = redeemer.Redeem(ctx, intent.TokenURL, intent.ClientID, authCode, intent.RedirectURI)
+		reqCfg := &reqconfig.Config{
+			RequestHeaders:      intent.RequestHeaders,
+			OrderRequestHeaders: intent.OrderRequestHeaders,
+			OrderBodyFields:     intent.OrderBodyFields,
+		}
+		resp, err = redeemer.RedeemWithConfig(ctx, intent.TokenURL, intent.ClientID, authCode, intent.RedirectURI, reqCfg)
 		if err != nil {
 			return sendError(ctx, client, cfg, fmt.Sprintf("token redemption failed: %v", err))
 		}
