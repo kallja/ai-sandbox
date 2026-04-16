@@ -102,11 +102,36 @@ Client B long-polls the relay, waiting for an encrypted intent. When one arrives
 
 Client A encrypts the OAuth intent, publishes it to the relay, and blocks until the Broker returns an encrypted response containing the auth code or tokens.
 
+## Docker compose testing
+
+An end-to-end Docker Compose test exercises the full protocol flow across containers. Test keys are baked into the image at build time.
+
+```sh
+cd oob-auth
+
+# Code mode (default) — tests the real client-b binary with piped stdin
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+
+# Token mode — uses test-broker with an embedded mock token endpoint
+docker compose -f docker-compose.test.yml --profile token-mode up --build --abort-on-container-exit
+```
+
+The compose file defines four services:
+
+| Service | Description |
+|---------|-------------|
+| `relay` | In-memory relay with health check on `/healthz` |
+| `client-b` | Real client-b binary, auth code piped to stdin |
+| `client-a` | Requester that publishes intent and prints the result |
+| `test-broker` | Non-interactive broker for token-mode testing (profile: `token-mode`) |
+
+A successful code-mode run prints `Auth Code: test-auth-code` from client-a.
+
 ## Infrastructure
 
 Terraform definitions live in `infra/`. They provision:
 
-- **GCP:** Cloud Run v2 (scale-to-zero), Firestore Native (with 5-minute TTL), scoped IAM service account, Secret Manager for Cloudflare credentials
+- **GCP:** Artifact Registry (Docker), Cloud Run v2 (scale-to-zero), Firestore Native (with 5-minute TTL), scoped IAM service account, Secret Manager for Cloudflare credentials
 - **Cloudflare:** Proxied CNAME to Cloud Run, WAF rate limiting (20 req/min/IP), geo-blocking, Zero Trust service tokens, HTTP header injection
 
 ```sh
@@ -116,6 +141,54 @@ terraform plan -var-file=prod.tfvars
 ```
 
 Required variables are defined in `variables.tf`. Terraform validates but cannot plan/apply without GCP and Cloudflare credentials.
+
+## Deploying
+
+### Prerequisites
+
+- GCP project with billing enabled
+- Cloudflare zone and API token (set `CLOUDFLARE_API_TOKEN`)
+- GCP credentials configured (`gcloud auth application-default login`)
+- A `prod.tfvars` file with: `gcp_project`, `cloudflare_zone_id`, `domain`, `relay_image`, and optionally `allowed_countries`
+
+### First deploy
+
+```sh
+# 1. Provision infrastructure
+cd oob-auth/infra
+terraform init
+terraform apply -var-file=prod.tfvars
+
+# 2. Authenticate Docker to Artifact Registry (one-time)
+gcloud auth configure-docker $(terraform output -raw artifact_registry_url | cut -d/ -f1)
+
+# 3. Build and push the relay image
+docker build -t $(terraform output -raw artifact_registry_url)/relay:latest ..
+docker push $(terraform output -raw artifact_registry_url)/relay:latest
+
+# 4. Deploy the image to Cloud Run
+terraform apply -var-file=prod.tfvars \
+  -var="relay_image=$(terraform output -raw artifact_registry_url)/relay:latest"
+```
+
+### Subsequent deploys
+
+Steps 3-4 only — build, push, apply:
+
+```sh
+cd oob-auth/infra
+docker build -t $(terraform output -raw artifact_registry_url)/relay:latest ..
+docker push $(terraform output -raw artifact_registry_url)/relay:latest
+terraform apply -var-file=prod.tfvars \
+  -var="relay_image=$(terraform output -raw artifact_registry_url)/relay:latest"
+```
+
+### Notes
+
+- The Dockerfile builds all binaries (relay, client-a, client-b, test-broker, keygen) into a single image. Cloud Run only runs the relay via `command`/`args` in the Terraform config.
+- Terraform is the single deployer — it manages both infra and the Cloud Run image revision. Using `gcloud run deploy` separately would cause state drift.
+- There is no CI/CD pipeline; deploys are manual.
+- State is local (no remote backend configured).
 
 ## How the protocol works
 
