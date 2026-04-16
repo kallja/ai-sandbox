@@ -20,7 +20,7 @@ variable "domain" {
 }
 
 variable "relay_image" {
-  description = "Container image URL for the relay server"
+  description = "Container image URL for the relay server (e.g. <region>-docker.pkg.dev/<project>/oob-auth/relay:<tag>)"
   type        = string
 }
 

@@ -1,4 +1,16 @@
 # --------------------------------------------------------------------------
+# Artifact Registry
+# --------------------------------------------------------------------------
+
+resource "google_artifact_registry_repository" "relay" {
+  project       = var.gcp_project
+  location      = var.gcp_region
+  repository_id = "oob-auth"
+  format        = "DOCKER"
+  description   = "OOB-Auth relay container images"
+}
+
+# --------------------------------------------------------------------------
 # Firestore
 # --------------------------------------------------------------------------
 
@@ -58,7 +70,9 @@ resource "google_cloud_run_v2_service" "relay" {
     service_account = google_service_account.relay.email
 
     containers {
-      image = var.relay_image
+      image   = var.relay_image
+      command = ["relay"]
+      args    = ["--store=firestore", "--gcp-project=${var.gcp_project}", "--addr=:8080"]
 
       ports {
         container_port = 8080
