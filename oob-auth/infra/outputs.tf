@@ -3,10 +3,10 @@ output "cloud_run_url" {
   value       = google_cloud_run_v2_service.relay.uri
 }
 
-output "relay_domain" {
-  description = "Public relay domain (via Cloudflare)"
-  value       = var.domain
-}
+# output "relay_domain" {
+#   description = "Public relay domain (via Cloudflare)"
+#   value       = var.domain
+# }
 
 output "service_account_email" {
   description = "Relay service account email"

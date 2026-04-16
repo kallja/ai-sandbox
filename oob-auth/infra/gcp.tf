@@ -5,9 +5,9 @@
 resource "google_artifact_registry_repository" "relay" {
   project       = var.gcp_project
   location      = var.gcp_region
-  repository_id = "oob-auth"
+  repository_id = "oobate"
   format        = "DOCKER"
-  description   = "OOB-Auth relay container images"
+  description   = "Oobate relay container images"
 }
 
 # --------------------------------------------------------------------------
@@ -16,7 +16,7 @@ resource "google_artifact_registry_repository" "relay" {
 
 resource "google_firestore_database" "queue" {
   project     = var.gcp_project
-  name        = "oob-auth-queue"
+  name        = "oobate-queue"
   location_id = var.gcp_region
   type        = "FIRESTORE_NATIVE"
 }
@@ -25,7 +25,7 @@ resource "google_firestore_database" "queue" {
 resource "google_firestore_field" "queue_ttl" {
   project    = var.gcp_project
   database   = google_firestore_database.queue.name
-  collection = "oob_auth_queue"
+  collection = "oobate_queue"
   field      = "created_at"
 
   ttl_config {}
@@ -36,8 +36,8 @@ resource "google_firestore_field" "queue_ttl" {
 # --------------------------------------------------------------------------
 
 resource "google_service_account" "relay" {
-  account_id   = "oob-auth-relay"
-  display_name = "OOB-Auth Relay"
+  account_id   = "oobate-relay"
+  display_name = "Oobate Relay"
   project      = var.gcp_project
 }
 
@@ -48,7 +48,7 @@ resource "google_project_iam_member" "relay_firestore" {
   member  = "serviceAccount:${google_service_account.relay.email}"
 
   condition {
-    title      = "oob-auth-db-only"
+    title      = "oobate-db-only"
     expression = "resource.name == 'projects/${var.gcp_project}/databases/${google_firestore_database.queue.name}'"
   }
 }
@@ -58,7 +58,7 @@ resource "google_project_iam_member" "relay_firestore" {
 # --------------------------------------------------------------------------
 
 resource "google_cloud_run_v2_service" "relay" {
-  name     = "oob-auth-relay"
+  name     = "oobate-relay"
   location = var.gcp_region
   project  = var.gcp_project
 
@@ -101,7 +101,7 @@ resource "google_cloud_run_v2_service" "relay" {
 # Store the Cloudflare client secret in Secret Manager so it's not
 # exposed as a plain-text env var in the Cloud Run revision.
 resource "google_secret_manager_secret" "cf_client_secret" {
-  secret_id = "oob-auth-cf-client-secret"
+  secret_id = "oobate-cf-client-secret"
   project   = var.gcp_project
 
   replication {

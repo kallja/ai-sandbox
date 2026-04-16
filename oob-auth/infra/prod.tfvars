@@ -1,5 +1,5 @@
-gcp_project        = "CHANGE_ME"
-gcp_region         = "europe-north1"
-cloudflare_zone_id = "CHANGE_ME"
-domain             = "relay.example.com"
-allowed_countries  = ["FI", "SE", "NO", "DK", "DE", "US"]
+gcp_project = "prj-secret-relay"
+gcp_region  = "europe-north1"
+# cloudflare_zone_id = "CHANGE_ME"
+domain = "relay.example.com"
+# allowed_countries = ["FI"]

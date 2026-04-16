@@ -6,10 +6,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 6.0"
     }
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 5.0"
-    }
+    # cloudflare = {
+    #   source  = "cloudflare/cloudflare"
+    #   version = "~> 5.0"
+    # }
   }
 }
 
@@ -18,6 +18,6 @@ provider "google" {
   region  = var.gcp_region
 }
 
-provider "cloudflare" {
-  # Authenticated via CLOUDFLARE_API_TOKEN env var.
-}
+# provider "cloudflare" {
+#   # Authenticated via CLOUDFLARE_API_TOKEN env var.
+# }
