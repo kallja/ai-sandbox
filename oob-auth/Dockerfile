@@ -9,7 +9,8 @@ RUN CGO_ENABLED=0 go build -o /out/relay       ./cmd/relay/ && \
     CGO_ENABLED=0 go build -o /out/client-a     ./cmd/client-a/ && \
     CGO_ENABLED=0 go build -o /out/client-b     ./cmd/client-b/ && \
     CGO_ENABLED=0 go build -o /out/test-broker  ./cmd/test-broker/ && \
-    CGO_ENABLED=0 go build -o /out/keygen       ./cmd/keygen/
+    CGO_ENABLED=0 go build -o /out/keygen       ./cmd/keygen/ && \
+    CGO_ENABLED=0 go build -o /out/chat         ./cmd/chat/
 
 # Generate test key pairs at build time.
 FROM alpine:3.21 AS keygen
