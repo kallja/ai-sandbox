@@ -1,0 +1,88 @@
+# End-to-end test for oob-auth using Docker Compose.
+#
+# Runs the full protocol flow: relay → client-b → client-a.
+# Test keys are baked into the image at build time.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+#
+# Code mode (default):
+#   client-a receives an auth code back from client-b.
+#   The mock auth code is piped to client-b's stdin.
+#
+# Token mode (uses test-broker with embedded mock token endpoint):
+#   docker compose -f docker-compose.test.yml --profile token-mode up --build --abort-on-container-exit
+
+services:
+  relay:
+    build: .
+    command: ["relay", "--store=memory", "--addr=:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 1s
+      timeout: 2s
+      retries: 10
+
+  client-b:
+    build: .
+    command:
+      - sh
+      - -c
+      - |
+        echo 'test-auth-code' | client-b \
+          --relay=http://relay:8080 \
+          --mode=code \
+          --key=/keys/broker-private.pem \
+          --peer-pub=/keys/requester-public.pem
+    depends_on:
+      relay:
+        condition: service_healthy
+
+  client-a:
+    build: .
+    command:
+      - client-a
+      - --relay=http://relay:8080
+      - --auth-url=https://auth.example.com/authorize
+      - --token-url=https://auth.example.com/token
+      - --client-id=test-client
+      - --scopes=read,write
+      - --key=/keys/requester-private.pem
+      - --peer-pub=/keys/broker-public.pem
+      - --timeout=30s
+    depends_on:
+      relay:
+        condition: service_healthy
+
+  # Token mode: uses test-broker (non-interactive, embedded mock token endpoint).
+  # Activate with: --profile token-mode
+  test-broker:
+    profiles: ["token-mode"]
+    build: .
+    command:
+      - test-broker
+      - --relay=http://relay:8080
+      - --mode=token
+      - --mock-code=test-auth-code
+      - --key=/keys/broker-private.pem
+      - --peer-pub=/keys/requester-public.pem
+    depends_on:
+      relay:
+        condition: service_healthy
+
+  client-a-token:
+    profiles: ["token-mode"]
+    build: .
+    command:
+      - client-a
+      - --relay=http://relay:8080
+      - --auth-url=https://auth.example.com/authorize
+      - --token-url=http://test-broker:9090/token
+      - --client-id=test-client
+      - --scopes=read,write
+      - --key=/keys/requester-private.pem
+      - --peer-pub=/keys/broker-public.pem
+      - --timeout=30s
+    depends_on:
+      relay:
+        condition: service_healthy

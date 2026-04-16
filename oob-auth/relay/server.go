@@ -22,6 +22,9 @@ type Server struct {
 func NewServer(store Store) *Server {
 	s := &Server{store: store}
 	s.mux = http.NewServeMux()
+	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 	s.mux.HandleFunc("POST /api/v1/queue/{queue_id}", s.handlePublish)
 	s.mux.HandleFunc("GET /api/v1/queue/{queue_id}", s.handleSubscribe)
 	return s
