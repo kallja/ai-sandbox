@@ -16,5 +16,27 @@ services:
     depends_on:
       - proxy
 
+  proxy:
+    image: ai-sandbox-proxy
+    ports:
+      - "127.0.0.1:${PROXY_UI_PORT:-0}:8081" # mitmweb UI
+    environment:
+      # If no hash is provided, Mitmproxy generates a random password that isn't shown anywhere effectively disabling web access.
+      # If provided, PASSWORD_HASH must be a valid Argon2i hash string.
+      - PASSWORD_HASH=${PASSWORD_HASH:-""}
+    volumes:
+      - ./certs:/home/mitmproxy/.mitmproxy
+    networks:
+      public:
+      internal_only:
+        aliases:
+          - proxy.local
+
 volumes:
   claude-memory:
+
+networks:
+  internal_only:
+    internal: true
+  public:
+    driver: bridge

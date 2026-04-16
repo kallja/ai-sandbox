@@ -13,4 +13,4 @@ else
   PREFIX="ai-sandbox"
 fi
 
-DC="docker compose -p $PREFIX -f $REPO_ROOT/.devcontainer/docker-compose.yml -f $REPO_ROOT/.devcontainer/proxy/docker-compose.yml"
+DC="docker compose -p $PREFIX -f $REPO_ROOT/.devcontainer/docker-compose.yml"

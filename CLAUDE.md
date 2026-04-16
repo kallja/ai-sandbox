@@ -24,16 +24,17 @@ mitmweb UI is at http://localhost:8081 when running.
 Proxy addon tests (run inside the devcontainer):
 
 ```
-pytest proxy/
+pytest proxy/addons/
 ```
 
 ## Key paths
 
-- `proxy/claude_auth.py` — OAuth token swapping and auth header injection
-- `proxy/traffic_control.py` — Request allow/deny rules
-- `proxy/rule.py` — Rule matching DSL
-- `proxy/Dockerfile` — Proxy container image (self-contained build context)
+- `proxy/addons/claude_auth.py` — OAuth token swapping and auth header injection
+- `proxy/addons/traffic_control.py` — Request allow/deny rules
+- `proxy/addons/rule.py` — Rule matching DSL
+- `proxy/Dockerfile` — Proxy container image (built separately as `ai-sandbox-proxy`)
 - `.devcontainer/Dockerfile` — Devcontainer image (Claude CLI + dev tools)
+- `.devcontainer/docker-compose.yml` — Both services, dual-network topology
 - `.devcontainer/config/` — Pre-baked Claude CLI settings (bypass permissions, skip onboarding)
 
 ## Worktrees

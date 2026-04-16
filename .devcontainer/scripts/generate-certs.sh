@@ -6,7 +6,7 @@ mkdir -p "$CERT_DIR"
 
 if [ -f "$CERT_DIR/mitmproxy-ca-cert.pem" ]; then
   echo "CA cert already exists at $CERT_DIR/mitmproxy-ca-cert.pem — skipping generation."
-  echo "Delete proxy/certs/ and re-run to regenerate."
+  echo "Delete .devcontainer/certs/ and re-run to regenerate."
   exit 0
 fi
 

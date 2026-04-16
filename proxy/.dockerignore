@@ -8,4 +8,4 @@
 **/__pycache__/
 **/.pytest_cache/
 **/test_*.py
-proxy/.venv
+addons/.venv
