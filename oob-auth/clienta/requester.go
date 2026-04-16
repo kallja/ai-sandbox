@@ -13,19 +13,22 @@ import (
 
 	"github.com/kallja/ai-sandbox/oob-auth/crypto"
 	"github.com/kallja/ai-sandbox/oob-auth/protocol"
+	"github.com/kallja/ai-sandbox/oob-auth/reqconfig"
 )
 
 // Config holds the settings for a Requester session.
 type Config struct {
-	RelayURL   string // Base URL of the relay backend.
-	AuthURL    string // OAuth authorization endpoint.
-	TokenURL   string // OAuth token endpoint.
-	ClientID   string // OAuth client ID.
-	Scopes     []string
+	RelayURL    string // Base URL of the relay backend.
+	AuthURL     string // OAuth authorization endpoint.
+	TokenURL    string // OAuth token endpoint.
+	ClientID    string // OAuth client ID.
+	Scopes      []string
 	RedirectURI string
 
 	PrivateKey ed25519.PrivateKey // Requester's Ed25519 private key.
 	PeerPub    ed25519.PublicKey  // Broker's Ed25519 public key.
+
+	ReqConfig *reqconfig.Config // Optional request customization.
 }
 
 // Result holds the decrypted response from the Broker.
@@ -59,6 +62,15 @@ func Run(ctx context.Context, cfg *Config, client *http.Client) (*Result, error)
 		CodeChallenge:   challenge,
 		ChallengeMethod: "S256",
 		State:           generateState(),
+	}
+
+	// Attach request customization if provided.
+	if cfg.ReqConfig != nil {
+		intent.ExtraParams = cfg.ReqConfig.ExtraParams
+		intent.OrderQueryParams = cfg.ReqConfig.OrderQueryParams
+		intent.RequestHeaders = cfg.ReqConfig.RequestHeaders
+		intent.OrderRequestHeaders = cfg.ReqConfig.OrderRequestHeaders
+		intent.OrderBodyFields = cfg.ReqConfig.OrderBodyFields
 	}
 
 	plaintext, err := protocol.MarshalIntent(intent)

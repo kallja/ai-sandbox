@@ -24,6 +24,7 @@ func main() {
 	privKeyPath := flag.String("key", "", "path to Ed25519 private key PEM")
 	peerPubPath := flag.String("peer-pub", "", "path to Requester's Ed25519 public key PEM")
 	timeout := flag.Duration("timeout", 10*time.Minute, "max time to wait for intent")
+	_ = flag.String("request-file", "", "path to YAML request config file (reserved)")
 	flag.Parse()
 
 	if *privKeyPath == "" || *peerPubPath == "" {
