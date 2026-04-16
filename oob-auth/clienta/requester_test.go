@@ -109,19 +109,27 @@ func simulateBroker(t *testing.T, relayURL string, brokerKP, requesterKP *crypto
 
 	// Decrypt intent (verify it's valid).
 	env, _ := protocol.UnmarshalEnvelope(envData)
-	_, err := crypto.Open(env.Ciphertext, env.Nonce, requesterKP.Public, brokerKP.Private)
+	var envNonce [24]byte
+	copy(envNonce[:], env.Nonce)
+	padded, err := crypto.Open(env.Ciphertext, envNonce, requesterKP.Public, brokerKP.Private)
 	if err != nil {
 		t.Errorf("broker: decrypt intent: %v", err)
+		return
+	}
+	_, err = crypto.Unpad(padded)
+	if err != nil {
+		t.Errorf("broker: unpad intent: %v", err)
 		return
 	}
 
 	// Encrypt and publish the response.
 	respData, _ := protocol.MarshalResponse(resp)
-	nonce, ct, _ := crypto.Seal(respData, brokerKP.Private, requesterKP.Public)
+	respPadded, _ := crypto.Pad(respData, protocol.PaddedPlaintextSize)
+	nonce, ct, _ := crypto.Seal(respPadded, brokerKP.Private, requesterKP.Public)
 
 	respEnv := &protocol.Envelope{
 		SenderID:   crypto.Fingerprint(brokerKP.Public),
-		Nonce:      nonce,
+		Nonce:      nonce[:],
 		Ciphertext: ct,
 	}
 	respEnvData, _ := protocol.MarshalEnvelope(respEnv)
@@ -277,7 +285,7 @@ func TestPublish_Success(t *testing.T) {
 
 	env := &protocol.Envelope{
 		SenderID:   "test-sender",
-		Nonce:      [24]byte{1, 2, 3},
+		Nonce:      make([]byte, 24),
 		Ciphertext: []byte("encrypted"),
 	}
 
@@ -304,7 +312,7 @@ func TestPublish_ServerError(t *testing.T) {
 }
 
 func TestSubscribe_ImmediateData(t *testing.T) {
-	env := &protocol.Envelope{SenderID: "test", Nonce: [24]byte{1}, Ciphertext: []byte("ct")}
+	env := &protocol.Envelope{SenderID: "test", Nonce: make([]byte, 24), Ciphertext: []byte("ct")}
 	envData, _ := protocol.MarshalEnvelope(env)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +332,7 @@ func TestSubscribe_ImmediateData(t *testing.T) {
 
 func TestSubscribe_ReconnectsOn204(t *testing.T) {
 	attempts := 0
-	env := &protocol.Envelope{SenderID: "test", Nonce: [24]byte{1}, Ciphertext: []byte("ct")}
+	env := &protocol.Envelope{SenderID: "test", Nonce: make([]byte, 24), Ciphertext: []byte("ct")}
 	envData, _ := protocol.MarshalEnvelope(env)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

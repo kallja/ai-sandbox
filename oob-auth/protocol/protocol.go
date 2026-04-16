@@ -4,19 +4,46 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
 
-// MaxPayloadSize is the maximum ciphertext size the relay will accept (4 KB).
-const MaxPayloadSize = 4096
+const (
+	// EnvelopeSize is the exact size (in bytes) of every serialized envelope
+	// on the wire. The relay rejects anything that isn't exactly this size.
+	EnvelopeSize = 4096
+
+	// NaClBoxOverhead is the Poly1305 authentication tag added by NaCl box.
+	NaClBoxOverhead = 16
+
+	// envelopeJSONOverhead is the fixed number of bytes consumed by the JSON
+	// structure, sender_id (64 hex chars), and nonce (32 base64 chars),
+	// excluding the ciphertext base64 content.
+	envelopeJSONOverhead = 139
+
+	// CiphertextSize is the fixed raw ciphertext length that, when base64-
+	// encoded, produces a JSON envelope of EnvelopeSize - 1 bytes (the last
+	// byte is a padding space).
+	// 4096 - 139 = 3957 remaining → floor(3957/4)*3 = 2967 → 3956 base64 chars
+	// 139 + 3956 = 4095 → +1 trailing space = 4096
+	CiphertextSize = 2967
+
+	// PaddedPlaintextSize is the fixed plaintext size after ISO 7816-4
+	// padding and before NaCl box encryption.
+	PaddedPlaintextSize = CiphertextSize - NaClBoxOverhead // 2951
+
+	// MaxMessageSize is the largest cleartext message that fits after
+	// reserving one byte for the ISO 7816-4 padding marker.
+	MaxMessageSize = PaddedPlaintextSize - 1 // 2950
+)
 
 // Envelope is the E2EE container transmitted through the relay.
 // The relay sees only opaque bytes — it never decrypts.
 type Envelope struct {
-	SenderID   string   `json:"sender_id"`   // SHA-256 fingerprint of sender's public key.
-	Nonce      [24]byte `json:"nonce"`        // Random nonce for NaCl box.
-	Ciphertext []byte   `json:"ciphertext"`   // Sealed JSON payload.
+	SenderID   string `json:"sender_id"`   // SHA-256 fingerprint of sender's public key.
+	Nonce      []byte `json:"nonce"`        // Random nonce for NaCl box (24 bytes, base64 in JSON).
+	Ciphertext []byte `json:"ciphertext"`   // Sealed padded payload (fixed size).
 }
 
 // Intent is the cleartext payload sent by Client A (the Requester).
@@ -82,17 +109,31 @@ func UnmarshalResponse(data []byte) (*Response, error) {
 	return &resp, nil
 }
 
-// MarshalEnvelope serializes an Envelope to JSON bytes.
+// MarshalEnvelope serializes an Envelope to exactly EnvelopeSize bytes.
+// The JSON payload is right-padded with a single space to reach the target.
 func MarshalEnvelope(env *Envelope) ([]byte, error) {
 	data, err := json.Marshal(env)
 	if err != nil {
 		return nil, fmt.Errorf("marshal envelope: %w", err)
 	}
+	if len(data) > EnvelopeSize {
+		return nil, fmt.Errorf("envelope JSON too large: %d bytes (max %d)", len(data), EnvelopeSize)
+	}
+	if len(data) < EnvelopeSize {
+		buf := make([]byte, EnvelopeSize)
+		copy(buf, data)
+		for i := len(data); i < EnvelopeSize; i++ {
+			buf[i] = ' '
+		}
+		data = buf
+	}
 	return data, nil
 }
 
-// UnmarshalEnvelope deserializes an Envelope from JSON bytes.
+// UnmarshalEnvelope deserializes an Envelope from JSON bytes,
+// trimming any trailing whitespace padding first.
 func UnmarshalEnvelope(data []byte) (*Envelope, error) {
+	data = bytes.TrimRight(data, " ")
 	var env Envelope
 	if err := json.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("unmarshal envelope: %w", err)

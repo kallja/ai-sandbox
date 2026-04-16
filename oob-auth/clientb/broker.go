@@ -41,11 +41,18 @@ func Run(ctx context.Context, cfg *Config, client *http.Client, auth OAuthExecut
 	}
 
 	// Decrypt the intent.
-	plaintext, err := crypto.Open(envelope.Ciphertext, envelope.Nonce, cfg.PeerPub, cfg.PrivateKey)
+	var nonce [24]byte
+	copy(nonce[:], envelope.Nonce)
+	padded, err := crypto.Open(envelope.Ciphertext, nonce, cfg.PeerPub, cfg.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("decrypt intent: %w", err)
 	}
-	defer crypto.Zero(plaintext)
+	defer crypto.Zero(padded)
+
+	plaintext, err := crypto.Unpad(padded)
+	if err != nil {
+		return fmt.Errorf("unpad intent: %w", err)
+	}
 
 	intent, err := protocol.UnmarshalIntent(plaintext)
 	if err != nil {
@@ -79,9 +86,15 @@ func sendResponse(ctx context.Context, client *http.Client, cfg *Config, resp *p
 	if err != nil {
 		return err
 	}
-	defer crypto.Zero(plaintext)
 
-	nonce, ciphertext, err := crypto.Seal(plaintext, cfg.PrivateKey, cfg.PeerPub)
+	padded, err := crypto.Pad(plaintext, protocol.PaddedPlaintextSize)
+	if err != nil {
+		return fmt.Errorf("pad response: %w", err)
+	}
+	crypto.Zero(plaintext)
+	defer crypto.Zero(padded)
+
+	nonce, ciphertext, err := crypto.Seal(padded, cfg.PrivateKey, cfg.PeerPub)
 	if err != nil {
 		return fmt.Errorf("encrypt response: %w", err)
 	}
@@ -89,7 +102,7 @@ func sendResponse(ctx context.Context, client *http.Client, cfg *Config, resp *p
 	myPub := cfg.PrivateKey.Public().(ed25519.PublicKey)
 	envelope := &protocol.Envelope{
 		SenderID:   crypto.Fingerprint(myPub),
-		Nonce:      nonce,
+		Nonce:      nonce[:],
 		Ciphertext: ciphertext,
 	}
 
@@ -112,9 +125,6 @@ func publish(ctx context.Context, client *http.Client, relayURL, queueID string,
 	data, err := protocol.MarshalEnvelope(env)
 	if err != nil {
 		return err
-	}
-	if len(data) > protocol.MaxPayloadSize {
-		return fmt.Errorf("envelope too large: %d bytes (max %d)", len(data), protocol.MaxPayloadSize)
 	}
 
 	url := relayURL + "/api/v1/queue/" + queueID

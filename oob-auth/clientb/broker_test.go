@@ -103,10 +103,11 @@ func (m *mockRedeemer) Redeem(ctx context.Context, tokenURL, clientID, authCode,
 func publishIntent(t *testing.T, relayURL string, requesterKP, brokerKP *crypto.KeyPair, intent *protocol.Intent) {
 	t.Helper()
 	plaintext, _ := protocol.MarshalIntent(intent)
-	nonce, ct, _ := crypto.Seal(plaintext, requesterKP.Private, brokerKP.Public)
+	padded, _ := crypto.Pad(plaintext, protocol.PaddedPlaintextSize)
+	nonce, ct, _ := crypto.Seal(padded, requesterKP.Private, brokerKP.Public)
 	env := &protocol.Envelope{
 		SenderID:   crypto.Fingerprint(requesterKP.Public),
-		Nonce:      nonce,
+		Nonce:      nonce[:],
 		Ciphertext: ct,
 	}
 	envData, _ := protocol.MarshalEnvelope(env)
@@ -140,9 +141,15 @@ func collectResponse(t *testing.T, relayURL string, requesterKP, brokerKP *crypt
 	}
 
 	env, _ := protocol.UnmarshalEnvelope(envData)
-	plaintext, err := crypto.Open(env.Ciphertext, env.Nonce, brokerKP.Public, requesterKP.Private)
+	var nonce [24]byte
+	copy(nonce[:], env.Nonce)
+	padded, err := crypto.Open(env.Ciphertext, nonce, brokerKP.Public, requesterKP.Private)
 	if err != nil {
 		t.Fatalf("decrypt broker response: %v", err)
+	}
+	plaintext, err := crypto.Unpad(padded)
+	if err != nil {
+		t.Fatalf("unpad broker response: %v", err)
 	}
 	resp, _ := protocol.UnmarshalResponse(plaintext)
 	return resp

@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
@@ -115,7 +116,7 @@ func TestMarshalUnmarshalResponse_WithError(t *testing.T) {
 }
 
 func TestMarshalUnmarshalEnvelope(t *testing.T) {
-	nonce := [24]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24}
+	nonce := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24}
 	original := &Envelope{
 		SenderID:   "abc123fingerprint",
 		Nonce:      nonce,
@@ -127,6 +128,10 @@ func TestMarshalUnmarshalEnvelope(t *testing.T) {
 		t.Fatalf("MarshalEnvelope: %v", err)
 	}
 
+	if len(data) != EnvelopeSize {
+		t.Errorf("serialized envelope = %d bytes, want %d", len(data), EnvelopeSize)
+	}
+
 	got, err := UnmarshalEnvelope(data)
 	if err != nil {
 		t.Fatalf("UnmarshalEnvelope: %v", err)
@@ -135,10 +140,10 @@ func TestMarshalUnmarshalEnvelope(t *testing.T) {
 	if got.SenderID != original.SenderID {
 		t.Errorf("SenderID = %q, want %q", got.SenderID, original.SenderID)
 	}
-	if got.Nonce != original.Nonce {
+	if !bytes.Equal(got.Nonce, original.Nonce) {
 		t.Errorf("Nonce mismatch")
 	}
-	if string(got.Ciphertext) != string(original.Ciphertext) {
+	if !bytes.Equal(got.Ciphertext, original.Ciphertext) {
 		t.Errorf("Ciphertext mismatch")
 	}
 }
@@ -167,13 +172,15 @@ func TestUnmarshalEnvelope_InvalidJSON(t *testing.T) {
 func TestEnvelope_JSONFieldNames(t *testing.T) {
 	env := &Envelope{
 		SenderID:   "test",
-		Nonce:      [24]byte{},
+		Nonce:      make([]byte, 24),
 		Ciphertext: []byte("ct"),
 	}
 	data, _ := MarshalEnvelope(env)
 
+	// Trim trailing whitespace padding before checking JSON fields.
+	trimmed := bytes.TrimRight(data, " ")
 	var raw map[string]json.RawMessage
-	json.Unmarshal(data, &raw)
+	json.Unmarshal(trimmed, &raw)
 
 	for _, key := range []string{"sender_id", "nonce", "ciphertext"} {
 		if _, ok := raw[key]; !ok {
@@ -214,8 +221,24 @@ func TestResponse_OmitEmptyFields(t *testing.T) {
 	}
 }
 
-func TestMaxPayloadSize(t *testing.T) {
-	if MaxPayloadSize != 4096 {
-		t.Errorf("MaxPayloadSize = %d, want 4096", MaxPayloadSize)
+func TestEnvelopeSize(t *testing.T) {
+	if EnvelopeSize != 4096 {
+		t.Errorf("EnvelopeSize = %d, want 4096", EnvelopeSize)
+	}
+}
+
+func TestMarshalEnvelope_FixedSize(t *testing.T) {
+	// With a correctly sized ciphertext, output must be exactly EnvelopeSize.
+	env := &Envelope{
+		SenderID:   "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		Nonce:      make([]byte, 24),
+		Ciphertext: make([]byte, CiphertextSize),
+	}
+	data, err := MarshalEnvelope(env)
+	if err != nil {
+		t.Fatalf("MarshalEnvelope: %v", err)
+	}
+	if len(data) != EnvelopeSize {
+		t.Errorf("len = %d, want %d", len(data), EnvelopeSize)
 	}
 }

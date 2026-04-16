@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -44,17 +45,13 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, int64(protocol.MaxPayloadSize)+1))
+	body, err := io.ReadAll(io.LimitReader(r.Body, int64(protocol.EnvelopeSize)+1))
 	if err != nil {
 		http.Error(w, "read error", http.StatusInternalServerError)
 		return
 	}
-	if len(body) > protocol.MaxPayloadSize {
-		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
-		return
-	}
-	if len(body) == 0 {
-		http.Error(w, "empty payload", http.StatusBadRequest)
+	if len(body) != protocol.EnvelopeSize {
+		http.Error(w, fmt.Sprintf("payload must be exactly %d bytes, got %d", protocol.EnvelopeSize, len(body)), http.StatusBadRequest)
 		return
 	}
 

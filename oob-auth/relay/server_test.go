@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/kallja/ai-sandbox/oob-auth/protocol"
 )
 
 func newTestServer() (*Server, *httptest.Server) {
@@ -18,11 +19,16 @@ func newTestServer() (*Server, *httptest.Server) {
 	return srv, ts
 }
 
+// validPayload returns a string of exactly protocol.EnvelopeSize bytes.
+func validPayload(fill string) string {
+	return strings.Repeat(fill, protocol.EnvelopeSize/len(fill)+1)[:protocol.EnvelopeSize]
+}
+
 func TestPublish_Created(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
-	resp, err := http.Post(ts.URL+"/api/v1/queue/test-queue", "application/json", strings.NewReader(`{"data":"hello"}`))
+	resp, err := http.Post(ts.URL+"/api/v1/queue/test-queue", "application/json", strings.NewReader(validPayload("x")))
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -52,25 +58,40 @@ func TestPublish_PayloadTooLarge(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
-	// 4097 bytes exceeds the 4096 byte limit.
-	body := strings.Repeat("x", 4097)
+	// 4097 bytes exceeds the exact 4096 byte requirement.
+	body := strings.Repeat("x", protocol.EnvelopeSize+1)
 	resp, err := http.Post(ts.URL+"/api/v1/queue/test-queue", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusRequestEntityTooLarge {
-		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusRequestEntityTooLarge)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
 	}
 }
 
-func TestPublish_ExactMaxPayload(t *testing.T) {
+func TestPublish_PayloadTooSmall(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
-	// Exactly 4096 bytes should be accepted.
-	body := strings.Repeat("x", 4096)
+	body := strings.Repeat("x", protocol.EnvelopeSize-1)
+	resp, err := http.Post(ts.URL+"/api/v1/queue/test-queue", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+}
+
+func TestPublish_ExactEnvelopeSize(t *testing.T) {
+	_, ts := newTestServer()
+	defer ts.Close()
+
+	body := validPayload("x")
 	resp, err := http.Post(ts.URL+"/api/v1/queue/test-queue", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("POST: %v", err)
@@ -113,7 +134,7 @@ func TestPublishThenSubscribe(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
-	payload := `{"envelope":"data"}`
+	payload := validPayload("d")
 
 	// Publish first.
 	resp, _ := http.Post(ts.URL+"/api/v1/queue/q1", "application/json", strings.NewReader(payload))
@@ -132,7 +153,7 @@ func TestPublishThenSubscribe(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != payload {
-		t.Errorf("body = %q, want %q", body, payload)
+		t.Errorf("body length = %d, want %d", len(body), len(payload))
 	}
 }
 
@@ -140,7 +161,7 @@ func TestSubscribeThenPublish(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
-	payload := `{"envelope":"async"}`
+	payload := validPayload("a")
 	var wg sync.WaitGroup
 	var gotBody []byte
 	var gotStatus int
@@ -171,7 +192,7 @@ func TestSubscribeThenPublish(t *testing.T) {
 		t.Fatalf("status = %d, want %d", gotStatus, http.StatusOK)
 	}
 	if string(gotBody) != payload {
-		t.Errorf("body = %q, want %q", gotBody, payload)
+		t.Errorf("body length = %d, want %d", len(gotBody), len(payload))
 	}
 }
 
@@ -180,7 +201,7 @@ func TestPopAndDrop(t *testing.T) {
 	defer ts.Close()
 
 	// Publish one message.
-	resp, _ := http.Post(ts.URL+"/api/v1/queue/once", "application/json", strings.NewReader(`"one-shot"`))
+	resp, _ := http.Post(ts.URL+"/api/v1/queue/once", "application/json", strings.NewReader(validPayload("p")))
 	resp.Body.Close()
 
 	// First subscribe gets the message.
@@ -208,10 +229,13 @@ func TestPublish_OverwritesPrevious(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
+	first := validPayload("1")
+	second := validPayload("2")
+
 	// Publish two messages to the same queue.
-	resp, _ := http.Post(ts.URL+"/api/v1/queue/overwrite", "application/json", strings.NewReader(`"first"`))
+	resp, _ := http.Post(ts.URL+"/api/v1/queue/overwrite", "application/json", strings.NewReader(first))
 	resp.Body.Close()
-	resp, _ = http.Post(ts.URL+"/api/v1/queue/overwrite", "application/json", strings.NewReader(`"second"`))
+	resp, _ = http.Post(ts.URL+"/api/v1/queue/overwrite", "application/json", strings.NewReader(second))
 	resp.Body.Close()
 
 	// Subscribe should get the latest.
@@ -219,8 +243,8 @@ func TestPublish_OverwritesPrevious(t *testing.T) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	if string(body) != `"second"` {
-		t.Errorf("body = %q, want %q", body, `"second"`)
+	if string(body) != second {
+		t.Errorf("body = %q..., want %q...", string(body[:10]), second[:10])
 	}
 }
 
@@ -234,12 +258,12 @@ func TestConcurrentPublishSubscribe(t *testing.T) {
 	// Launch n concurrent publish-subscribe pairs on different queues.
 	for i := 0; i < n; i++ {
 		queueID := string(rune('a'+i)) + "-queue"
-		payload := []byte(`"msg-` + queueID + `"`)
+		payload := validPayload(string(rune('a' + i)))
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resp, err := http.Post(ts.URL+"/api/v1/queue/"+queueID, "application/json", bytes.NewReader(payload))
+			resp, err := http.Post(ts.URL+"/api/v1/queue/"+queueID, "application/json", strings.NewReader(payload))
 			if err != nil {
 				t.Errorf("publish %s: %v", queueID, err)
 				return
@@ -268,7 +292,7 @@ func TestSubscribe_ContentType(t *testing.T) {
 	_, ts := newTestServer()
 	defer ts.Close()
 
-	resp, _ := http.Post(ts.URL+"/api/v1/queue/ct", "application/json", strings.NewReader(`{}`))
+	resp, _ := http.Post(ts.URL+"/api/v1/queue/ct", "application/json", strings.NewReader(validPayload("c")))
 	resp.Body.Close()
 
 	resp, _ = http.Get(ts.URL + "/api/v1/queue/ct")
@@ -285,7 +309,7 @@ func TestDifferentQueuesAreIsolated(t *testing.T) {
 	defer ts.Close()
 
 	// Publish to queue-a.
-	resp, _ := http.Post(ts.URL+"/api/v1/queue/queue-a", "application/json", strings.NewReader(`"a"`))
+	resp, _ := http.Post(ts.URL+"/api/v1/queue/queue-a", "application/json", strings.NewReader(validPayload("a")))
 	resp.Body.Close()
 
 	// Subscribe to queue-b should not get queue-a's message.
@@ -298,6 +322,6 @@ func TestDifferentQueuesAreIsolated(t *testing.T) {
 
 	if resp.StatusCode == http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("queue-b should be empty, got: %s", body)
+		t.Errorf("queue-b should be empty, got: %d bytes", len(body))
 	}
 }
