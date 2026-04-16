@@ -3,6 +3,7 @@ package clienta
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -368,5 +369,47 @@ func TestSubscribe_ServerError(t *testing.T) {
 	_, err := subscribe(context.Background(), http.DefaultClient, ts.URL, "q1")
 	if err == nil {
 		t.Error("subscribe should fail on 500")
+	}
+}
+
+func TestGenerateState_Length(t *testing.T) {
+	s := generateState()
+	// 32 bytes → 44 base64 chars → strip padding '=' → 43 chars.
+	if len(s) != 43 {
+		t.Errorf("state length = %d, want 43", len(s))
+	}
+}
+
+func TestGenerateState_URLSafe(t *testing.T) {
+	// Generate many states and check none contain +, /, or =.
+	for i := 0; i < 100; i++ {
+		s := generateState()
+		for _, banned := range []byte{'+', '/', '='} {
+			for _, c := range []byte(s) {
+				if c == banned {
+					t.Errorf("state contains %q: %s", string(banned), s)
+				}
+			}
+		}
+	}
+}
+
+func TestGenerateState_Unique(t *testing.T) {
+	s1 := generateState()
+	s2 := generateState()
+	if s1 == s2 {
+		t.Error("two generateState calls produced identical values")
+	}
+}
+
+func TestGenerateState_ValidBase64URL(t *testing.T) {
+	s := generateState()
+	// Should be decodable as base64 RawURLEncoding (no padding, URL-safe alphabet).
+	decoded, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		t.Fatalf("state is not valid base64url: %v", err)
+	}
+	if len(decoded) != 32 {
+		t.Errorf("decoded length = %d, want 32", len(decoded))
 	}
 }

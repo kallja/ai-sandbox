@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
-	"time"
+	"strings"
 
 	"github.com/kallja/ai-sandbox/oob-auth/crypto"
 	"github.com/kallja/ai-sandbox/oob-auth/protocol"
@@ -56,7 +58,7 @@ func Run(ctx context.Context, cfg *Config, client *http.Client) (*Result, error)
 		RedirectURI:     cfg.RedirectURI,
 		CodeChallenge:   challenge,
 		ChallengeMethod: "S256",
-		State:           fmt.Sprintf("%d", time.Now().UnixNano()),
+		State:           generateState(),
 	}
 
 	plaintext, err := protocol.MarshalIntent(intent)
@@ -122,6 +124,22 @@ func Run(ctx context.Context, cfg *Config, client *http.Client) (*Result, error)
 		ExpiresIn:   resp.ExpiresIn,
 		Error:       resp.Error,
 	}, nil
+}
+
+// generateState produces a cryptographically random state parameter:
+// 32 random bytes → standard base64 → URL-safe (+ → -, / → _) → strip padding.
+// This matches the Node.js reference: crypto.randomBytes(32).toString('base64')
+// with +→-, /→_, =→removed.
+func generateState() string {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		panic("crypto/rand failed: " + err.Error())
+	}
+	s := base64.StdEncoding.EncodeToString(buf)
+	s = strings.ReplaceAll(s, "+", "-")
+	s = strings.ReplaceAll(s, "/", "_")
+	s = strings.ReplaceAll(s, "=", "")
+	return s
 }
 
 // publish sends an encrypted envelope to the relay.
