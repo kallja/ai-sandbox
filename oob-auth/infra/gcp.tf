@@ -70,7 +70,7 @@ resource "google_cloud_run_v2_service" "relay" {
     service_account = google_service_account.relay.email
 
     containers {
-      image   = var.relay_image
+      image   = local.relay_image
       command = ["relay"]
       args    = ["--store=firestore", "--gcp-project=${var.gcp_project}", "--addr=:8080"]
 

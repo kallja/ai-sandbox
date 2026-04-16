@@ -20,8 +20,13 @@ variable "domain" {
 }
 
 variable "relay_image" {
-  description = "Container image URL for the relay server (e.g. <region>-docker.pkg.dev/<project>/oob-auth/relay:<tag>)"
+  description = "Container image URL for the relay server"
   type        = string
+  default     = null
+}
+
+locals {
+  relay_image = coalesce(var.relay_image, "${var.gcp_region}-docker.pkg.dev/${var.gcp_project}/${google_artifact_registry_repository.relay.repository_id}/relay:latest")
 }
 
 variable "allowed_countries" {
