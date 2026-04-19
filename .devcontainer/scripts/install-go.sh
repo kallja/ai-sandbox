@@ -11,21 +11,20 @@ usage() {
 VERSION="$1"
 SHA256_AMD64="$2"
 SHA256_ARM64="$3"
-GCS_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ARCH="$(uname -m)"
 case "$ARCH" in
-    x86_64)  CLAUDE_ARCH="x64";  SHA256="$SHA256_AMD64" ;;
-    aarch64) CLAUDE_ARCH="arm64"; SHA256="$SHA256_ARM64" ;;
+    x86_64)  GO_ARCH="amd64"; SHA256="$SHA256_AMD64" ;;
+    aarch64) GO_ARCH="arm64";  SHA256="$SHA256_ARM64" ;;
     *)       echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
-BIN_DIR="$HOME/.local/bin"
-mkdir -p "$BIN_DIR"
+TARBALL="/tmp/go${VERSION}.linux-${GO_ARCH}.tar.gz"
 
 "$SCRIPT_DIR/verified-download.sh" \
-    "${GCS_BUCKET}/${VERSION}/linux-${CLAUDE_ARCH}/claude" \
+    "https://go.dev/dl/go${VERSION}.linux-${GO_ARCH}.tar.gz" \
     "$SHA256" \
-    "${BIN_DIR}/claude"
-chmod +x "${BIN_DIR}/claude"
+    "$TARBALL"
+tar -C /usr/local -xzf "$TARBALL"
+rm -f "$TARBALL"
