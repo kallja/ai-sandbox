@@ -73,12 +73,12 @@ The `POST` body is strictly 4,096 bytes, encrypted via a **Sealed Box** using th
 | `32 - 55` | 24 bytes | **Encryption Nonce** (For XChaCha20). |
 | `56 - 4095` | 4,040 bytes | **AEAD Ciphertext** (Encrypted for the Server). |
 
-**Inside the Decrypted Ciphertext (`56 - 4095`):**
+**Inside the Decrypted Ciphertext (4,024 bytes after removing 16-byte AEAD tag):**
 
 | Byte Range | Length | Description |
 | :--- | :--- | :--- |
 | `0 - 255` | 256 bytes | **The Routing Header:** <br>• `[0-31]`: MessageID (for replay protection).<br>• `[32-63]`: Sender Fingerprint.<br>• `[64-95]`: Recipient Fingerprint (Server's fingerprint if polling).<br>• `[96-159]`: Ed25519 Signature.<br>• `[160-255]`: Padding. |
-| `256 - 4039`| 3,784 bytes | **The Inner Envelope (E2EE Payload):** If routing to a peer, this is encrypted with the Recipient's public key (via Double Ratchet). See §3.4 for format. |
+| `256 - 4023`| 3,768 bytes | **The Inner Envelope (E2EE Payload):** If routing to a peer, this is encrypted with the Recipient's public key (via Double Ratchet). See §3.4 for format. |
 
 ### 3.3. Server-to-Client Response
 The server always responds with HTTP `200 OK` and a 4,096-byte body. It encrypts this response using the **Client's Ephemeral Key** (provided in bytes `0-31` of the request).
@@ -88,16 +88,18 @@ The server always responds with HTTP `200 OK` and a 4,096-byte body. It encrypts
 | `0 - 23` | 24 bytes | **Encryption Nonce** (For XChaCha20). |
 | `24 - 4095` | 4,072 bytes | **AEAD Ciphertext** (Encrypted for the polling Client). |
 
-**Inside the Decrypted Ciphertext (`24 - 4095`):**
+**Inside the Decrypted Ciphertext (4,056 bytes after removing 16-byte AEAD tag):**
 
 | Byte Range | Length | Description |
 | :--- | :--- | :--- |
 | `0 - 255` | 256 bytes | **Server Status Header:** <br>• `[0]`: Status Code (`0x01` DATA_FOLLOWS, `0x02` QUEUE_EMPTY, `0x03` ERR_AUTH_FAIL).<br>• `[1-255]`: Padding. |
-| `256 - 4071`| 3,816 bytes | **The Payload:** If `DATA_FOLLOWS`, contains the stripped **Inner Envelope**. If `QUEUE_EMPTY` or error, filled entirely with cryptographically secure random noise. |
+| `256 - 4055`| 3,800 bytes | **The Payload:** If `DATA_FOLLOWS`, contains the stripped **Inner Envelope**. If `QUEUE_EMPTY` or error, filled entirely with cryptographically secure random noise. |
 
 ### 3.4. The Inner Envelope (E2EE Payload) Format
 
-The 3,784-byte Inner Envelope carries peer-to-peer encrypted content. A 1-byte type flag at the start distinguishes handshake messages from ratcheted messages.
+The 3,768-byte Inner Envelope carries peer-to-peer encrypted content. A 1-byte type flag at the start distinguishes handshake messages from ratcheted messages.
+
+> **Note on AEAD overhead:** XChaCha20-Poly1305 appends a 16-byte Poly1305 authentication tag to all ciphertext. The "AEAD Ciphertext" lengths below include this tag. The usable plaintext capacity is 16 bytes less than the ciphertext field size.
 
 **Handshake Message (Type `0x01` — first message in a session):**
 
@@ -106,7 +108,7 @@ The 3,784-byte Inner Envelope carries peer-to-peer encrypted content. A 1-byte t
 | `0` | 1 byte | **Type:** `0x01` (HANDSHAKE). |
 | `1 - 32` | 32 bytes | **Ephemeral X25519 Public Key.** |
 | `33 - 1120` | 1,088 bytes | **ML-KEM-768 Ciphertext.** |
-| `1121 - 3783` | 2,663 bytes | **AEAD Ciphertext:** Encrypted message payload (XChaCha20-Poly1305 under the derived Root Key). |
+| `1121 - 3767` | 2,647 bytes | **AEAD Ciphertext** (2,631 bytes plaintext + 16-byte tag): Encrypted message payload (XChaCha20-Poly1305 under the derived Root Key). |
 
 **Ratcheted Message (Type `0x02` — subsequent messages):**
 
@@ -116,7 +118,7 @@ The 3,784-byte Inner Envelope carries peer-to-peer encrypted content. A 1-byte t
 | `1 - 32` | 32 bytes | **Ratchet Ephemeral X25519 Public Key** (for DH ratchet step). |
 | `33 - 36` | 4 bytes | **Message Number** (uint32, big-endian, for ordering within a chain). |
 | `37 - 40` | 4 bytes | **Previous Chain Length** (uint32, big-endian, for detecting skipped messages). |
-| `41 - 3783` | 3,743 bytes | **AEAD Ciphertext:** Encrypted message payload (XChaCha20-Poly1305 under the current chain key). |
+| `41 - 3767` | 3,727 bytes | **AEAD Ciphertext** (3,711 bytes plaintext + 16-byte tag): Encrypted message payload (XChaCha20-Poly1305 under the current chain key). |
 
 ---
 
@@ -131,7 +133,7 @@ The Relay Server is a stateless Go backend deployed on **Google Cloud Run (v2)**
 3. **Authenticate:** Verify the Ed25519 signature in the Routing Header. If invalid, return a padded `200 OK` with `ERR_AUTH_FAIL` status.
 4. **Replay Protection:** Check the `MessageID` against a 5-minute TTL cache. If found, drop the payload and return `200 OK` (`QUEUE_EMPTY` noise).
 5. **Route / Execute:**
-    * **If `RecipientID` == Peer:** Strip the 256-byte Routing Header. Store the 3,784-byte Inner Envelope in Firestore under the Recipient's Fingerprint with a `created_at` timestamp. Return padded `200 OK` (`QUEUE_EMPTY`).
+    * **If `RecipientID` == Peer:** Strip the 256-byte Routing Header. Store the 3,768-byte Inner Envelope in Firestore under the Recipient's Fingerprint with a `created_at` timestamp. Return padded `200 OK` (`QUEUE_EMPTY`).
     * **If `RecipientID` == Server (Poll):** Query Firestore for messages matching the Sender's Fingerprint, ordered by `created_at ASC`, limited to 1 (strict FIFO, one message per poll). If data exists, use a Firestore `RunTransaction` to atomically read and delete the document (Pop-and-Drop), package it, and return `200 OK` (`DATA_FOLLOWS`). If no data, return padded `200 OK` (`QUEUE_EMPTY`).
 
 ---
