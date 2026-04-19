@@ -7,6 +7,9 @@
 set -euo pipefail
 
 source "$(dirname "$0")/scripts/common.sh"
+REPO_ROOT="$(repo_root)"
+PREFIX="$(compose_prefix "$REPO_ROOT")"
+
 COMPOSE_PROJECT_NAME="$PREFIX" devcontainer up --workspace-folder "$REPO_ROOT"
 "$(dirname "$0")/scripts/inject-credentials.sh"
 

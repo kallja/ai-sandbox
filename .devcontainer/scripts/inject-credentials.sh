@@ -4,6 +4,8 @@
 set -euo pipefail
 
 source "$(dirname "$0")/common.sh"
+REPO_ROOT="$(repo_root)"
+DC="docker compose -p $(compose_prefix "$REPO_ROOT") -f $REPO_ROOT/.devcontainer/docker-compose.yml"
 
 CREDS_JSON="$(security find-generic-password -s "Claude Code-credentials" -a "$(whoami)" -w 2>/dev/null)" || true
 
