@@ -38,17 +38,34 @@ func Send(ctx context.Context, identity *Identity, peer *PeerConfig, relay *Rela
 		return fmt.Errorf("create AEAD: %w", err)
 	}
 
-	// The nonce is prepended to the ciphertext within the AEAD field.
+	// The AEAD field format: [2-byte big-endian length] [nonce (24)] [ciphertext+tag]
+	// Length prefix is needed because the field is zero-padded to a fixed size.
 	var nonce [24]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return fmt.Errorf("generate nonce: %w", err)
 	}
-	aeadCt := aead.Seal(nonce[:], nonce[:], message, nil)
+	encrypted := aead.Seal(nil, nonce[:], message, nil)
 
-	// Step 3: Build handshake inner envelope.
-	if len(aeadCt) > wire.HandshakeAEADCtSize {
-		return fmt.Errorf("message too large: AEAD ciphertext %d bytes, max %d", len(aeadCt), wire.HandshakeAEADCtSize)
+	// Build AEAD field: length(2) + nonce(24) + ciphertext.
+	aeadPayload := make([]byte, 2+24+len(encrypted))
+	totalLen := uint16(24 + len(encrypted))
+	aeadPayload[0] = byte(totalLen >> 8)
+	aeadPayload[1] = byte(totalLen)
+	copy(aeadPayload[2:], nonce[:])
+	copy(aeadPayload[26:], encrypted)
+
+	if len(aeadPayload) > wire.HandshakeAEADCtSize {
+		return fmt.Errorf("message too large: AEAD payload %d bytes, max %d", len(aeadPayload), wire.HandshakeAEADCtSize)
 	}
+
+	// Pad to exact field size.
+	aeadCt := make([]byte, wire.HandshakeAEADCtSize)
+	copy(aeadCt, aeadPayload)
+	// Fill remaining with random bytes.
+	if len(aeadPayload) < wire.HandshakeAEADCtSize {
+		rand.Read(aeadCt[len(aeadPayload):])
+	}
+
 	inner, err := envelope.BuildHandshakeInner(ephX25519Pub, mlkemCt, aeadCt)
 	if err != nil {
 		return fmt.Errorf("build inner: %w", err)

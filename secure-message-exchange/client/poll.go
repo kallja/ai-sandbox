@@ -195,14 +195,19 @@ func decryptHandshake(inner *envelope.HandshakeInner, identity *Identity) ([]byt
 		return nil, fmt.Errorf("create AEAD: %w", err)
 	}
 
-	// The AEAD field contains: 24-byte nonce + ciphertext+tag.
+	// The AEAD field format: [2-byte big-endian length] [nonce (24)] [ciphertext+tag] [padding]
 	aeadCt := inner.AEADCiphertext
-	if len(aeadCt) < 24+16 {
-		return nil, fmt.Errorf("AEAD ciphertext too short: %d bytes", len(aeadCt))
+	if len(aeadCt) < 2 {
+		return nil, fmt.Errorf("AEAD field too short: %d bytes", len(aeadCt))
 	}
 
-	nonce := aeadCt[:24]
-	ciphertext := aeadCt[24:]
+	payloadLen := int(aeadCt[0])<<8 | int(aeadCt[1])
+	if payloadLen < 24+16 || 2+payloadLen > len(aeadCt) {
+		return nil, fmt.Errorf("invalid AEAD payload length: %d", payloadLen)
+	}
+
+	nonce := aeadCt[2 : 2+24]
+	ciphertext := aeadCt[26 : 2+payloadLen]
 
 	plaintext, err := aead.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
