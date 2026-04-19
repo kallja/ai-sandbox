@@ -85,6 +85,12 @@ func deriveSymKey(priv *ecdh.PrivateKey, pub *ecdh.PublicKey, info []byte) ([32]
 	return symKey, nil
 }
 
+// DeriveRequestKey derives a symmetric key for encrypting/decrypting
+// request bodies (the same key used by SealedBoxSeal/Open).
+func DeriveRequestKey(priv *ecdh.PrivateKey, pub *ecdh.PublicKey) ([32]byte, error) {
+	return deriveSymKey(priv, pub, sealedBoxInfo)
+}
+
 // DeriveResponseKey derives a symmetric key for encrypting/decrypting
 // server responses, using a distinct HKDF info string for domain separation.
 func DeriveResponseKey(priv *ecdh.PrivateKey, pub *ecdh.PublicKey) ([32]byte, error) {
