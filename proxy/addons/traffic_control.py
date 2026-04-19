@@ -3,8 +3,8 @@ import sys
 from mitmproxy import http
 from rule import rule, FinalizedRule
 from claude_auth import RULES as CLAUDE_AUTH_RULES
-from github_auth import RULES as GITHUB_AUTH_RULES
-from linear_auth import RULES as LINEAR_AUTH_RULES
+# from github_auth import RULES as GITHUB_AUTH_RULES
+# from linear_auth import RULES as LINEAR_AUTH_RULES
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +14,12 @@ LOCAL_RULES: dict[str, list[FinalizedRule]] = {
         rule.path.starts_with("/api/hello").then("allow"),
         rule.path.starts_with("/").then("deny"),
     ],
-    "api.github.com": [
-        rule.then("deny"),
-    ],
-    "mcp.linear.app": [
-        rule.then("deny"),
-    ],
+    # "api.github.com": [
+    #     rule.then("deny"),
+    # ],
+    # "mcp.linear.app": [
+    #     rule.then("deny"),
+    # ],
     "downloads.claude.ai": [
         rule.path.starts_with("/").then("deny"),
     ],
@@ -27,6 +27,7 @@ LOCAL_RULES: dict[str, list[FinalizedRule]] = {
         rule.path.starts_with("/anthropics/").then("deny"),
     ],
     "github.com": [
+        rule.path("/anthropics").then("deny"),
         rule.path.starts_with("/anthropics/").then("deny"),
     ],
     "storage.googleapis.com": [
@@ -40,7 +41,7 @@ LOCAL_RULES: dict[str, list[FinalizedRule]] = {
 
 
 def _merge_rules(
-    *rule_dicts: dict[str, list[FinalizedRule]]
+    *rule_dicts: dict[str, list[FinalizedRule]],
 ) -> dict[str, list[FinalizedRule]]:
     """Merge rule dicts. Earlier dicts take priority (their rules come first per host)."""
     merged: dict[str, list[FinalizedRule]] = {}
@@ -50,7 +51,12 @@ def _merge_rules(
     return merged
 
 
-RULES = _merge_rules(CLAUDE_AUTH_RULES, GITHUB_AUTH_RULES, LINEAR_AUTH_RULES, LOCAL_RULES)
+RULES = _merge_rules(
+    CLAUDE_AUTH_RULES,
+    # GITHUB_AUTH_RULES,
+    # LINEAR_AUTH_RULES,
+    LOCAL_RULES,
+)
 
 
 def _log(msg: str) -> None:
