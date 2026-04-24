@@ -3,5 +3,5 @@
   "service": "claude",
   "workspaceFolder": "${localWorkspaceFolder}",
   "initializeCommand": ".devcontainer/scripts/initialize.sh",
-  "postCreateCommand": ".devcontainer/scripts/post-create.sh"
+  "postCreateCommand": "/devcontainer/scripts/post-create.sh"
 }

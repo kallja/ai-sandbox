@@ -4,4 +4,6 @@
 # actual workspace path so the repo-trust dialog is pre-accepted.
 set -euo pipefail
 
+echo "Post-create command running ${PWD}"
+
 sed -i "s|__WORKSPACE_ROOT__|$PWD|" /home/claude/.claude.json
