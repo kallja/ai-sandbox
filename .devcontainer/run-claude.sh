@@ -6,4 +6,4 @@
 #   .devcontainer/run-claude.sh [claude args...]
 set -euo pipefail
 
-"$(dirname "$0")/run.sh" claude
+"$(dirname "$0")/run.sh" claude --dangerously-skip-permissions

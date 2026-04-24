@@ -1,6 +1,7 @@
 {
     "voiceEnabled": false,
     "skipDangerousModePermissionPrompt": true,
+    "skipWebFetchPreflight": true,
     "permissions": {
         "defaultMode": "bypassPermissions"
     }

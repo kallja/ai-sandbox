@@ -21,11 +21,12 @@ case "$ARCH" in
     *)       echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
-BIN_DIR="$HOME/.local/bin"
-mkdir -p "$BIN_DIR"
+INSTALL_DIR="/opt/claude"
+mkdir -p "$INSTALL_DIR"
 
 "$SCRIPT_DIR/verified-download.sh" \
     "${GCS_BUCKET}/${VERSION}/linux-${CLAUDE_ARCH}/claude" \
     "$SHA256" \
-    "${BIN_DIR}/claude"
-chmod +x "${BIN_DIR}/claude"
+    "${INSTALL_DIR}/claude"
+chmod +x "${INSTALL_DIR}/claude"
+ln -sf "${INSTALL_DIR}/claude" /usr/local/bin/claude
