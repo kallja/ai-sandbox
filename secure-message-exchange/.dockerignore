@@ -1,0 +1,8 @@
+.git
+testdata
+e2etest
+integration
+docs
+infra
+scripts
+*.md
